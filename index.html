@@ -48,8 +48,10 @@
     background:var(--card); border-radius:14px; padding:34px 40px 36px; margin:0 0 26px;
     border:0; min-inline-size:0;
   }
-  .card > legend, .lbl{padding:0; font-weight:600; font-size:18px; margin-bottom:14px; display:block; float:none; width:100%}
-  fieldset.card > legend + *{margin-top:0}
+  .lbl{padding:0; font-weight:600; font-size:18px; margin-bottom:14px; display:block; width:100%}
+  /* legend de fieldset: sem o float o navegador a desenha em cima da borda e corta o título */
+  .card > legend{float:left; width:100%; padding:0; margin:0 0 14px; font-weight:600; font-size:18px; line-height:1.35}
+  .card > legend + *{clear:both}
   .req{color:var(--danger); margin-left:4px}
   .hint{margin:12px 0 0; font-size:14.5px; color:var(--muted)}
   .sub{font-size:14.5px; color:var(--muted); margin-top:6px}
