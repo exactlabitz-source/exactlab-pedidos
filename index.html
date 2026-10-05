@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#002060">
+<title>ExactLab — Solicitação laboratorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#002060;
+    --navy-deep:#001748;
+    --gold:#EBB030;
+    --card:#E6ECFF;
+    --ink:#1B2559;
+    --muted:#5C648E;
+    --line:#707799;
+    --danger:#D3303F;
+    --font:"Saira Semi Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:16px}
+  body{
+    margin:0; background:var(--navy); color:var(--ink); font-family:var(--font);
+    font-size:17px; line-height:1.35; -webkit-text-size-adjust:100%;
+    padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+  }
+  .wrap{max-width:900px; margin:0 auto; padding:28px 18px 64px}
+
+  /* Etapas */
+  .steps{display:flex; align-items:flex-start; justify-content:center; gap:0; margin:0 auto 36px; max-width:300px}
+  .step{display:flex; flex-direction:column; align-items:center; gap:6px; width:64px; color:var(--gold); font-weight:600; opacity:.45; transition:opacity .2s}
+  .step.is-on{opacity:1}
+  .step .sq{width:32px; height:32px; border-radius:6px; background:var(--gold); color:var(--navy); display:grid; place-items:center; font-weight:700}
+  .step.is-current .sq{outline:2px solid var(--gold); outline-offset:3px}
+  .steps .line{flex:1; height:2px; background:var(--gold); margin-top:15px; opacity:.45}
+  .steps .line.is-on{opacity:1}
+
+  /* Cabeçalho */
+  .head{text-align:center; margin-bottom:44px}
+  .head h1{margin:0 0 10px; font-size:38px; font-weight:600; color:var(--gold); letter-spacing:.2px}
+  .head p{margin:0; color:var(--gold); font-weight:500; font-size:18px}
+
+  /* Cartões */
+  .card{
+    background:var(--card); border-radius:14px; padding:34px 40px 36px; margin:0 0 26px;
+    border:0; min-inline-size:0;
+  }
+  .card > legend, .lbl{padding:0; font-weight:600; font-size:18px; margin-bottom:14px; display:block; float:none; width:100%}
+  fieldset.card > legend + *{margin-top:0}
+  .req{color:var(--danger); margin-left:4px}
+  .hint{margin:12px 0 0; font-size:14.5px; color:var(--muted)}
+  .sub{font-size:14.5px; color:var(--muted); margin-top:6px}
+
+  /* Campos */
+  .cols{display:flex; flex-wrap:wrap; gap:14px}
+  .cols > div{flex:1 1 220px; max-width:292px; min-width:0}
+  input[type=text], input[type=email], input[type=tel], input[type=date], textarea, select{
+    width:100%; font:inherit; color:var(--ink); background:var(--card);
+    border:1px solid var(--line); border-radius:6px; height:46px; padding:0 14px; outline:none;
+  }
+  textarea{height:auto; min-height:118px; padding:12px 14px; resize:vertical}
+  input:focus-visible, textarea:focus-visible, select:focus-visible{border-color:var(--navy); box-shadow:0 0 0 3px rgba(0,32,96,.25)}
+  .with-ico{position:relative}
+  .with-ico svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:20px; height:20px; stroke:#8A91B4; fill:none; stroke-width:1.6; pointer-events:none}
+  .with-ico input{padding-left:42px}
+  .narrow{max-width:384px}
+  .phone{display:flex; max-width:384px}
+  .phone select{width:96px; flex:none; border-radius:6px 0 0 6px; border-right:0; padding:0 8px; font-weight:600}
+  .phone input{border-radius:0 6px 6px 0}
+  .field-err{display:none; color:var(--danger); font-size:14.5px; margin-top:8px; font-weight:500}
+  .is-invalid .field-err{display:block}
+  .is-invalid input[type=text], .is-invalid input[type=email], .is-invalid input[type=tel], .is-invalid input[type=date], .is-invalid select{border-color:var(--danger)}
+
+  /* Caixas de seleção */
+  .chk{display:flex; align-items:flex-start; gap:12px; cursor:pointer; padding:7px 0; user-select:none}
+  .chk input{position:absolute; opacity:0; pointer-events:none}
+  .chk .box{
+    flex:none; width:22px; height:22px; border:1.5px solid var(--ink); border-radius:5px; background:var(--card);
+    display:grid; place-items:center; margin-top:1px; transition:background .12s
+  }
+  .chk .box::after{content:""; width:11px; height:6px; border:solid #fff; border-width:0 0 2.5px 2.5px; transform:rotate(-45deg) translate(1px,-1px); opacity:0}
+  .chk input:checked + .box{background:var(--navy); border-color:var(--navy)}
+  .chk input:checked + .box::after{opacity:1}
+  .chk input:focus-visible + .box{outline:3px solid rgba(0,32,96,.35); outline-offset:2px}
+  .chk .txt{font-weight:500}
+  .row{display:flex; flex-wrap:wrap; gap:6px 28px}
+  .row .chk .txt{font-weight:600}
+
+  /* Anexos */
+  .drop{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border:1.5px dashed var(--line); border-radius:8px; min-height:84px; padding:0 14px 0 8px;
+  }
+  .drop.is-over{background:#D7E0FF; border-color:var(--navy)}
+  .drop-main{flex:1; text-align:left; background:none; border:0; font:inherit; font-weight:500; color:var(--ink); height:84px; padding:0 14px; cursor:pointer}
+  .drop-tools{display:flex; align-items:center; gap:6px}
+  .drop-tools .sep{width:1px; height:24px; background:var(--line); margin:0 6px}
+  .ico{width:44px; height:44px; border-radius:8px; border:0; background:none; cursor:pointer; display:grid; place-items:center; color:var(--ink)}
+  .ico:hover{background:rgba(0,32,96,.08)}
+  .ico svg{width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+  .drop-main:focus-visible, .ico:focus-visible{outline:3px solid rgba(0,32,96,.35); outline-offset:2px}
+  .rec{background:var(--danger); color:#fff}
+  .rec:hover{background:var(--danger)}
+  .rec svg{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.45}}
+  .flist{list-style:none; margin:12px 0 0; padding:0; display:grid; gap:10px}
+  .flist li{display:flex; align-items:center; gap:12px; background:#F3F6FF; border:1px solid #C9D3F5; border-radius:8px; padding:8px 10px}
+  .flist .thumb{width:46px; height:46px; border-radius:6px; background:#D0D9F8; object-fit:cover; flex:none; display:grid; place-items:center; color:var(--ink)}
+  .flist .thumb svg{width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+  .flist .meta{flex:1; min-width:0}
+  .flist .name{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .flist .size{font-size:13.5px; color:var(--muted)}
+  .flist audio{width:100%; height:34px; margin-top:6px}
+  .flist .del{flex:none; width:36px; height:36px; border:0; border-radius:8px; background:none; cursor:pointer; color:var(--danger); display:grid; place-items:center}
+  .flist .del:hover{background:rgba(211,48,63,.12)}
+  .flist .del svg{width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+  .drop-msg{margin:10px 0 0; font-size:14.5px; font-weight:500; color:var(--danger); min-height:0}
+  .drop-msg.info{color:var(--ink)}
+
+  /* Botões */
+  .actions{display:flex; justify-content:center; gap:14px; margin-top:34px; flex-wrap:wrap}
+  .btn{
+    font:inherit; font-weight:600; font-size:18px; height:52px; padding:0 40px; border-radius:999px; border:0; cursor:pointer;
+    position:relative; overflow:hidden; min-width:132px;
+  }
+  .btn.light{background:#fff; color:#111}
+  .btn.gold{background:var(--gold); color:var(--navy-deep)}
+  .btn:focus-visible{outline:3px solid #fff; outline-offset:3px}
+  .btn[disabled]{cursor:progress; opacity:.9}
+  .btn .bar{position:absolute; left:0; bottom:0; height:4px; background:var(--navy); width:0; transition:width .2s}
+  .banner{display:none; background:#FFE9EB; color:#8E1B27; border-radius:10px; padding:14px 18px; margin:0 0 22px; font-weight:500}
+  .banner.on{display:block}
+
+  /* Confirmação */
+  .done{background:var(--card); border-radius:14px; padding:44px 40px; text-align:center}
+  .done .tick{width:60px; height:60px; border-radius:50%; background:var(--navy); display:grid; place-items:center; margin:0 auto 18px}
+  .done .tick svg{width:30px; height:30px; stroke:#fff; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round}
+  .done h2{margin:0 0 8px; font-size:28px; font-weight:600}
+  .done p{margin:6px 0; color:var(--muted); font-size:17px}
+  .done dl{display:inline-grid; grid-template-columns:auto auto; gap:8px 22px; text-align:left; margin:20px 0 6px; font-size:17px}
+  .done dt{color:var(--muted)}
+  .done dd{margin:0; font-weight:600}
+  .demo{display:inline-block; margin-top:18px; background:#FFF4D6; color:#6B4A00; border-radius:8px; padding:10px 14px; font-size:15px; font-weight:500; max-width:520px}
+  [hidden]{display:none !important}
+
+  @media (max-width:600px){
+    .card{padding:26px 20px 28px}
+    .head h1{font-size:32px}
+    .head p{font-size:16px}
+    .drop{padding-right:8px}
+    .done{padding:34px 22px}
+  }
+  @media (prefers-reduced-motion:reduce){ .rec svg{animation:none} .step,.btn .bar{transition:none} }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <nav class="steps" id="steps" aria-label="Etapas do pedido">
+    <div class="step is-on is-current" data-s="1"><span class="sq">1</span><span>Dados</span></div>
+    <div class="line" id="line"></div>
+    <div class="step" data-s="2"><span class="sq">2</span><span>Serviço</span></div>
+  </nav>
+
+  <header class="head" id="head">
+    <h1>ExactLab</h1>
+    <p>Odontologia Digital: exactlabitz@gmail.com (Wetransfer) Whatsapp: 99 982500013</p>
+  </header>
+
+  <form id="pedido" novalidate autocomplete="off">
+
+    <!-- ETAPA 1 — DADOS -->
+    <section id="step1">
+      <div class="card" data-req>
+        <span class="lbl" id="lb-pac">Nome Completo: Paciente<span class="req" aria-hidden="true">*</span></span>
+        <div class="cols" role="group" aria-labelledby="lb-pac">
+          <div>
+            <div class="with-ico">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+              <input type="text" id="pac-nome" name="paciente_nome" required aria-label="Nome do paciente">
+            </div>
+            <div class="sub">Nome</div>
+          </div>
+          <div>
+            <input type="text" id="pac-sobrenome" name="paciente_sobrenome" required aria-label="Sobrenome do paciente">
+            <div class="sub">Sobrenome</div>
+          </div>
+        </div>
+        <div class="field-err">Informe nome e sobrenome do paciente.</div>
+      </div>
+
+      <div class="card" data-req>
+        <span class="lbl" id="lb-dent">Nome Completo: Cirurgião Dentista<span class="req" aria-hidden="true">*</span></span>
+        <div class="cols" role="group" aria-labelledby="lb-dent">
+          <div>
+            <div class="with-ico">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+              <input type="text" id="den-nome" name="dentista_nome" required aria-label="Nome do cirurgião dentista">
+            </div>
+            <div class="sub">Nome</div>
+          </div>
+          <div>
+            <input type="text" id="den-sobrenome" name="dentista_sobrenome" required aria-label="Sobrenome do cirurgião dentista">
+            <div class="sub">Sobrenome</div>
+          </div>
+        </div>
+        <div class="field-err">Informe nome e sobrenome do cirurgião dentista.</div>
+      </div>
+
+      <div class="card" data-req>
+        <label class="lbl" for="email">Email: Cirurgião Dentista<span class="req" aria-hidden="true">*</span></label>
+        <div class="with-ico narrow">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          <input type="email" id="email" name="email" required inputmode="email" autocapitalize="off">
+        </div>
+        <div class="field-err">Informe um e-mail válido.</div>
+      </div>
+
+      <div class="card" data-req>
+        <label class="lbl" for="zap">Whatsapp:<span class="req" aria-hidden="true">*</span></label>
+        <div class="phone">
+          <select id="ddi" name="ddi" aria-label="Código do país">
+            <option value="55" selected>BR +55</option>
+            <option value="351">PT +351</option>
+            <option value="1">US +1</option>
+            <option value="595">PY +595</option>
+            <option value="54">AR +54</option>
+          </select>
+          <input type="tel" id="zap" name="whatsapp" required inputmode="tel" placeholder="(DDD) + Whatsapp">
+        </div>
+        <div class="field-err">Informe o WhatsApp com DDD.</div>
+      </div>
+
+      <fieldset class="card">
+        <legend>Origem do Trabalho Laboratorial:</legend>
+        <label class="chk"><input type="checkbox" name="origem" value="Consultório Particular"><span class="box"></span><span class="txt">Consultório Particular</span></label>
+        <label class="chk"><input type="checkbox" name="origem" value="Escola de Pós-Graduação"><span class="box"></span><span class="txt">Escola de Pós-Graduação</span></label>
+      </fieldset>
+
+      <div class="actions"><button type="button" class="btn light" id="next">Próximo</button></div>
+    </section>
+
+    <!-- ETAPA 2 — SERVIÇO -->
+    <section id="step2" hidden>
+      <div class="card" data-req>
+        <label class="lbl" for="data">Data da solicitação:<span class="req" aria-hidden="true">*</span></label>
+        <div class="narrow"><input type="date" id="data" name="data_solicitacao" required></div>
+        <div class="field-err">Informe a data da solicitação.</div>
+      </div>
+
+      <div id="odonto"></div>
+      <div id="grupos"></div>
+
+      <div class="card">
+        <label class="lbl" for="cor">Cor do Trabalho:</label>
+        <input type="text" id="cor" name="cor_trabalho">
+      </div>
+      <div class="card">
+        <label class="lbl" for="mat">Material restaurador:</label>
+        <input type="text" id="mat" name="material_restaurador">
+      </div>
+      <div class="card">
+        <label class="lbl" for="comp">Componente Protético/Scanbody Utilizado:</label>
+        <div class="narrow"><input type="text" id="comp" name="componente_protetico"></div>
+      </div>
+      <div class="card">
+        <label class="lbl" for="obs">Observações sobre o trabalho:</label>
+        <textarea id="obs" name="observacoes" rows="4"></textarea>
+      </div>
+
+      <div class="card">
+        <span class="lbl">Imagem Caso Clínico</span>
+        <div class="drop" data-key="imagens" data-kind="image" data-accept="image/*">
+          <button type="button" class="drop-main" data-act="pick">Escolher arquivo(s)</button>
+          <span class="drop-tools">
+            <button type="button" class="ico" data-act="pick" aria-label="Enviar imagens da galeria">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+            </button>
+            <span class="sep"></span>
+            <button type="button" class="ico" data-act="capture" aria-label="Tirar foto com a câmera">
+              <svg viewBox="0 0 24 24"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.6"/></svg>
+            </button>
+          </span>
+        </div>
+        <ul class="flist"></ul>
+        <p class="drop-msg" role="status"></p>
+      </div>
+
+      <div class="card">
+        <span class="lbl">Video Caso Clínico</span>
+        <div class="drop" data-key="video" data-kind="video" data-accept="video/*">
+          <button type="button" class="drop-main" data-act="pick">Escolher arquivo(s)</button>
+          <span class="drop-tools">
+            <button type="button" class="ico" data-act="pick" aria-label="Enviar vídeos da galeria">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+            </button>
+            <span class="sep"></span>
+            <button type="button" class="ico" data-act="capture" aria-label="Gravar vídeo com a câmera">
+              <svg viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/></svg>
+            </button>
+          </span>
+        </div>
+        <ul class="flist"></ul>
+        <p class="drop-msg" role="status"></p>
+      </div>
+
+      <div class="card">
+        <span class="lbl">Audio Caso Clinico</span>
+        <div class="drop" data-key="audio" data-kind="audio" data-accept="audio/*">
+          <button type="button" class="drop-main" data-act="pick">Escolher arquivo</button>
+          <span class="drop-tools">
+            <button type="button" class="ico" data-act="pick" aria-label="Enviar áudio do aparelho">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+            </button>
+            <span class="sep"></span>
+            <button type="button" class="ico" data-act="record" aria-label="Gravar áudio agora">
+              <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>
+            </button>
+          </span>
+        </div>
+        <ul class="flist"></ul>
+        <p class="drop-msg" role="status"></p>
+        <p class="hint">Toque no microfone para gravar a explicação do caso e toque de novo para parar.</p>
+      </div>
+
+      <div class="banner" id="banner" role="alert"></div>
+
+      <div class="actions">
+        <button type="button" class="btn light" id="back">Voltar</button>
+        <button type="submit" class="btn gold" id="send"><span class="t">Enviar</span><span class="bar"></span></button>
+      </div>
+    </section>
+  </form>
+
+  <section class="done" id="done" hidden aria-live="polite">
+    <div class="tick"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+    <h2>Solicitação enviada</h2>
+    <p>O laboratório recebeu o pedido e já pode começar a análise do caso.</p>
+    <dl id="resumo"></dl>
+    <div><span class="demo" id="demo" hidden>Modo de teste: nada foi enviado de verdade. Defina o endereço do webhook no início do script para ativar o envio.</span></div>
+    <div class="actions"><button type="button" class="btn gold" id="novo">Nova solicitação</button></div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  /* ===== CONFIGURAÇÃO =====
+     WEBHOOK_URL: endereço do webhook que vai receber o pedido (ex.: n8n).
+     Enquanto estiver vazio, o formulário funciona em modo de teste e não envia nada. */
+  const CONFIG = {
+    WEBHOOK_URL: "",
+    MAX_FILE_MB: 50
+  };
+
+  const $  = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  /* ===== Conteúdo do formulário ===== */
+  const ODONTO = [
+    ['1', [11,12,13,14,15,16,17]],
+    ['2', [21,22,23,24,25,26,27]],
+    ['3', [31,32,33,34,35,36,37]],
+    ['4', [41,42,43,44,45,46,47]]
+  ];
+
+  const GRUPOS = [
+    { title:'Serviços Laboratoriais', items:[
+      'Barra usinada (Titânio)','Barra fundida','Protocolo provisório impresso','Modelo em gesso com gengiva artificial',
+      'Moldeira individual','Plano de orientação','Montagem dos dentes','Acrilização','Aparelho ortopédico',
+      'Contenção ortodôntica','Coroas/facetas em cerâmica sobre dente','Coroas em cerâmica sobre implante','Estrutura metálica para PPR'
+    ]},
+    { title:'EXACTMODEL', items:['Modelo de estudo.','Modelo ortodôntico. (BASE ZOCALADA)'], note:'Modelo feito por método da impressão 3D.' },
+    { title:'EXACTFLEX', items:['Guia multifuncional com aletas apoiadas sobre os dentes para captura e auxilio indireto das fresagens.'] },
+    { title:'EXACTCROWN', items:['Coroa impressa com carga cerâmica sobre dente/implante. (INLAY, ONLAY, VONLAY)'] },
+    { title:'EXACTPROV', items:['Coroa impressa 3D sobre dente/implante. (INLAY, ONLAY, VONLAY) - Resina sem carga cerâmica.'] },
+    { title:'EXACTGUIDE', items:['Cirurgia guiada com planejamento digital e guias cirúrgicos personalizados, da imagem ao implante, com precisão milimétrica.'] },
+    { title:'EXACTSPLINT', items:[
+      'Placas miorrelaxantes personalizadas, planejadas digitalmente. (COM GUIAS DE DESOCLUSÃO)',
+      'Placas miorrelaxantes personalizadas, planejadas digitalmente. (SEM GUIAS DE DESOCLUSÃO)'
+    ]},
+    { title:'EXACTPERIO', items:['Guia cirúrgico periodontal personalizado, planejado digitalmente para gengivoplastia e gengivectomia com precisão e previsibilidade.'] },
+    { title:'EXACTSMILEDESIGN', items:['Enceramento digital personalizado, planejando o sorriso ideal antes mesmo do primeiro procedimento.'] },
+    { title:'EXACTSHELL', items:['Mockup impresso em 3D, acoplado diretamente na boca para simular o resultado do sorriso antes do tratamento.'] },
+    { title:'EXACTPROTUS', items:['Mandíbula','Maxila','Região','ATMs'], note:'Protipagem realizada apartir da TOMOGRAFIA COMPUTADORIZADA.' }
+  ];
+
+  const chk = (name, value, label) =>
+    `<label class="chk"><input type="checkbox" name="${esc(name)}" value="${esc(value)}"><span class="box"></span><span class="txt">${esc(label)}</span></label>`;
+
+  $('#odonto').innerHTML = ODONTO.map(([n, dentes]) =>
+    `<fieldset class="card" data-odonto="${n}"><legend>Odontograma ${n}</legend>
+       <div class="row">${dentes.map(d => chk('odonto' + n, d, d)).join('')}</div></fieldset>`
+  ).join('');
+
+  $('#grupos').innerHTML = GRUPOS.map((g, i) =>
+    `<fieldset class="card" data-grupo="${esc(g.title)}"><legend>${esc(g.title)}</legend>
+       ${g.items.map(it => chk('grupo' + i, it, it)).join('')}
+       ${g.note ? `<p class="hint">${esc(g.note)}</p>` : ''}</fieldset>`
+  ).join('');
+
+  /* data de hoje como padrão */
+  const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $('#data').value = hoje;
+
+  /* máscara do WhatsApp (Brasil) */
+  const zap = $('#zap'), ddi = $('#ddi');
+  zap.addEventListener('input', () => {
+    if (ddi.value !== '55') return;
+    const d = zap.value.replace(/\D/g, '').slice(0, 11);
+    zap.value = d.length > 10 ? d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
+              : d.length > 6  ? d.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3')
+              : d.length > 2  ? d.replace(/(\d{2})(\d{0,5})/, '($1) $2') : d;
+  });
+
+  /* ===== Etapas ===== */
+  const s1 = $('#step1'), s2 = $('#step2'), form = $('#pedido');
+  function goStep(n) {
+    s1.hidden = n !== 1; s2.hidden = n !== 2;
+    $$('.step').forEach(el => {
+      const s = +el.dataset.s;
+      el.classList.toggle('is-on', s <= n);
+      el.classList.toggle('is-current', s === n);
+    });
+    $('#line').classList.toggle('is-on', n === 2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function validar(section) {
+    let primeiro = null;
+    $$('.card[data-req]', section).forEach(card => {
+      let ok = true;
+      $$('input[required], select[required]', card).forEach(inp => {
+        const vazio = !inp.value.trim();
+        const emailRuim = inp.type === 'email' && !inp.checkValidity();
+        const zapRuim = inp.id === 'zap' && inp.value.replace(/\D/g, '').length < (ddi.value === '55' ? 10 : 6);
+        if (vazio || emailRuim || zapRuim) { ok = false; if (!primeiro) primeiro = inp; }
+      });
+      card.classList.toggle('is-invalid', !ok);
+    });
+    if (primeiro) primeiro.focus();
+    return !primeiro;
+  }
+  form.addEventListener('input', e => { const c = e.target.closest('.card'); if (c) c.classList.remove('is-invalid'); });
+
+  $('#next').addEventListener('click', () => { if (validar(s1)) goStep(2); });
+  $('#back').addEventListener('click', () => goStep(1));
+
+  /* ===== Anexos: imagens, vídeos e áudios ===== */
+  const state = { imagens: [], video: [], audio: [] };
+  const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+  const ICONES = {
+    video: '<svg viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/></svg>',
+    audio: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>',
+    del:   '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></svg>'
+  };
+
+  $$('.drop').forEach(drop => {
+    const key = drop.dataset.key, kind = drop.dataset.kind;
+    const box = drop.parentElement, lista = $('.flist', box), msg = $('.drop-msg', box);
+    const arquivos = state[key];
+    const urls = new Map();
+
+    const criarInput = capture => {
+      const i = document.createElement('input');
+      i.type = 'file'; i.accept = drop.dataset.accept; i.hidden = true;
+      i.multiple = !capture;
+      if (capture) i.setAttribute('capture', 'environment');
+      i.addEventListener('change', () => { adicionar([...i.files]); i.value = ''; });
+      drop.append(i);
+      return i;
+    };
+    const inPick = criarInput(false);
+    const inCap = kind === 'audio' ? null : criarInput(true);
+
+    function aviso(texto, info) { msg.textContent = texto || ''; msg.classList.toggle('info', !!info); }
+
+    function adicionar(novos) {
+      const max = CONFIG.MAX_FILE_MB * 1048576;
+      const recusados = [];
+      novos.forEach(f => {
+        if (f.size > max) { recusados.push(f.name); return; }
+        arquivos.push(f);
+      });
+      aviso(recusados.length
+        ? `Arquivo acima de ${CONFIG.MAX_FILE_MB} MB não foi anexado: ${recusados.join(', ')}. Envie por WeTransfer para exactlabitz@gmail.com.`
+        : '');
+      desenhar();
+    }
+
+    function desenhar() {
+      lista.innerHTML = '';
+      arquivos.forEach((f, idx) => {
+        if (!urls.has(f)) urls.set(f, URL.createObjectURL(f));
+        const url = urls.get(f);
+        const li = document.createElement('li');
+        const thumb = kind === 'image'
+          ? `<img class="thumb" src="${url}" alt="">`
+          : `<span class="thumb">${ICONES[kind]}</span>`;
+        li.innerHTML = `${thumb}<div class="meta"><div class="name"></div><div class="size">${fmt(f.size)}</div>
+          ${kind === 'audio' ? `<audio controls preload="metadata" src="${url}"></audio>` : ''}</div>
+          <button type="button" class="del" aria-label="Remover arquivo">${ICONES.del}</button>`;
+        $('.name', li).textContent = f.name;
+        $('.del', li).addEventListener('click', () => {
+          URL.revokeObjectURL(url); urls.delete(f); arquivos.splice(idx, 1); desenhar();
+        });
+        lista.append(li);
+      });
+    }
+
+    /* gravação de áudio direto no navegador */
+    let gravador = null, fluxo = null, partes = [], timer = null, t0 = 0;
+    const btnRec = $('[data-act="record"]', drop);
+    const mmss = ms => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+
+    async function iniciarGravacao() {
+      if (!navigator.mediaDevices || !window.MediaRecorder) {
+        aviso('Este navegador não grava áudio. Use o botão de enviar para anexar um áudio já gravado.');
+        return;
+      }
+      try {
+        fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        aviso('Não foi possível usar o microfone. Libere a permissão do navegador e tente de novo.');
+        return;
+      }
+      partes = [];
+      gravador = new MediaRecorder(fluxo);
+      gravador.ondataavailable = e => { if (e.data.size) partes.push(e.data); };
+      gravador.onstop = () => {
+        const tipo = gravador.mimeType || 'audio/webm';
+        const ext = tipo.includes('mp4') ? 'm4a' : tipo.includes('ogg') ? 'ogg' : 'webm';
+        const nome = `gravacao-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
+        fluxo.getTracks().forEach(t => t.stop());
+        clearInterval(timer);
+        btnRec.classList.remove('rec');
+        btnRec.setAttribute('aria-label', 'Gravar áudio agora');
+        aviso('');
+        adicionar([new File(partes, nome, { type: tipo })]);
+        gravador = null;
+      };
+      gravador.start();
+      t0 = Date.now();
+      btnRec.classList.add('rec');
+      btnRec.setAttribute('aria-label', 'Parar gravação');
+      aviso('Gravando 00:00. Toque no microfone para parar.', true);
+      timer = setInterval(() => aviso(`Gravando ${mmss(Date.now() - t0)}. Toque no microfone para parar.`, true), 500);
+    }
+
+    drop.addEventListener('click', e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      const act = b.dataset.act;
+      if (act === 'pick') inPick.click();
+      else if (act === 'capture' && inCap) inCap.click();
+      else if (act === 'record') { gravador ? gravador.stop() : iniciarGravacao(); }
+    });
+
+    /* arrastar e soltar (computador) */
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('is-over'); }));
+    drop.addEventListener('drop', e => {
+      const ok = [...e.dataTransfer.files].filter(f => f.type.startsWith(kind + '/'));
+      if (ok.length) adicionar(ok);
+    });
+  });
+
+  /* ===== Coleta dos dados ===== */
+  const val = id => $('#' + id).value.trim();
+  const marcados = (sel, root = document) => $$(sel + ':checked', root).map(i => i.value);
+
+  function coletar() {
+    const odontograma = {};
+    ODONTO.forEach(([n]) => { odontograma['odontograma_' + n] = marcados('input', $(`[data-odonto="${n}"]`)); });
+    const servicos = {};
+    $$('[data-grupo]').forEach(fs => {
+      const m = marcados('input', fs);
+      if (m.length) servicos[fs.dataset.grupo] = m;
+    });
+    const digitos = $('#zap').value.replace(/\D/g, '');
+    return {
+      enviado_em: new Date().toISOString(),
+      paciente: { nome: val('pac-nome'), sobrenome: val('pac-sobrenome') },
+      dentista: {
+        nome: val('den-nome'), sobrenome: val('den-sobrenome'), email: val('email'),
+        whatsapp: '+' + ddi.value + digitos, whatsapp_digitado: $('#zap').value
+      },
+      origem_trabalho: marcados('input[name="origem"]'),
+      data_solicitacao: val('data'),
+      odontograma,
+      servicos,
+      cor_trabalho: val('cor'),
+      material_restaurador: val('mat'),
+      componente_protetico: val('comp'),
+      observacoes: val('obs'),
+      anexos: { imagens: state.imagens.length, videos: state.video.length, audios: state.audio.length }
+    };
+  }
+
+  /* ===== Envio ===== */
+  const banner = $('#banner'), btn = $('#send'), bar = $('.bar', btn), label = $('.t', btn);
+  function erro(t) { banner.textContent = t; banner.classList.add('on'); banner.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  function livre() { btn.disabled = false; label.textContent = 'Enviar'; bar.style.width = '0'; }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    banner.classList.remove('on');
+    if (!validar(s1)) { goStep(1); return; }
+    if (!validar(s2)) return;
+
+    const dados = coletar();
+    btn.disabled = true; label.textContent = 'Enviando…';
+
+    if (!CONFIG.WEBHOOK_URL) {          /* modo de teste */
+      console.log('Pedido (modo de teste):', dados, state);
+      setTimeout(() => concluir(dados, true), 700);
+      return;
+    }
+
+    /* Campos de arquivo: imagem_1, imagem_2, video_1, audio_1… (um campo por arquivo, fácil de ler no n8n) */
+    const fd = new FormData();
+    fd.append('dados', JSON.stringify(dados));
+    state.imagens.forEach((f, i) => fd.append('imagem_' + (i + 1), f, f.name));
+    state.video.forEach((f, i)   => fd.append('video_'  + (i + 1), f, f.name));
+    state.audio.forEach((f, i)   => fd.append('audio_'  + (i + 1), f, f.name));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', CONFIG.WEBHOOK_URL);
+    xhr.upload.onprogress = ev => {
+      if (!ev.lengthComputable) return;
+      const p = Math.round(ev.loaded / ev.total * 100);
+      bar.style.width = p + '%'; label.textContent = `Enviando… ${p}%`;
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300)
+      ? concluir(dados, false)
+      : (livre(), erro('O servidor não aceitou o pedido (erro ' + xhr.status + '). Seus dados continuam preenchidos; tente de novo em instantes.'));
+    xhr.onerror = () => { livre(); erro('Não foi possível enviar. Verifique a conexão e tente de novo. Seus dados continuam preenchidos.'); };
+    xhr.send(fd);
+  });
+
+  function concluir(dados, demo) {
+    const nServ = Object.values(dados.servicos).reduce((a, b) => a + b.length, 0);
+    const nDentes = Object.values(dados.odontograma).reduce((a, b) => a + b.length, 0);
+    const linhas = [
+      ['Paciente', `${dados.paciente.nome} ${dados.paciente.sobrenome}`],
+      ['Cirurgião dentista', `${dados.dentista.nome} ${dados.dentista.sobrenome}`],
+      ['Serviços selecionados', nServ],
+      ['Dentes marcados', nDentes],
+      ['Imagens / vídeos / áudios', `${dados.anexos.imagens} / ${dados.anexos.videos} / ${dados.anexos.audios}`]
+    ];
+    const dl = $('#resumo'); dl.innerHTML = '';
+    linhas.forEach(([k, v]) => {
+      const dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = k; dd.textContent = v; dl.append(dt, dd);
+    });
+    $('#demo').hidden = !demo;
+    form.hidden = true; $('#steps').hidden = true; $('#done').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  $('#novo').addEventListener('click', () => location.reload());
+})();
+</script>
+</body>
+</html>
