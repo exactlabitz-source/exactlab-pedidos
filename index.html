@@ -223,7 +223,7 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
       </section>
 
 
-      <p class="note">Biblioteca de implantes: linha GM, superfícies Acqua e NeoPoros, Ø 3,5 a 7,0 mm. Parafuso de cobertura: use a chave Neo digital (104.060) e não exceda 10 N.cm na inserção.<br><br>Ferramenta de ensino e simulação. Os arquivos ficam só neste computador e nada é enviado. Não substitui o software de planejamento nem gera guia cirúrgica. As distâncias dependem da calibração do exame e da marcação do canal.</p>
+      <p class="note"><b style="color:var(--fg)">Biblioteca de implantes: Neodent Helix GM</b> (somente Helix), superfícies Acqua e NeoPoros, Ø 3,5 a 7,0 mm. Parafuso de cobertura: use a chave Neo digital (104.060) e não exceda 10 N.cm na inserção.<br><br><b style="color:var(--fg)">Ferramenta de ensino e simulação, para referência.</b> Nenhuma medida, distância ou avaliação deste programa é absoluta: todas servem como orientação didática e precisam ser confirmadas pelo profissional no exame original e no software de planejamento. Não substitui o planejamento clínico nem gera guia cirúrgica. Os resultados dependem da qualidade e calibração do exame e da marcação do canal. Os arquivos ficam só neste computador e nada é enviado.</p>
     </aside>
   </main>
 </div>
@@ -280,7 +280,7 @@ const st = {
   implants:[], sel:null, nerves:[], activeNerve:-1, nerveR:1.2, boneThr:400, boneOpacity:1,
   measures:[], idSeq:1, isDemo:false
 };
-// Catálogo linha GM (Acqua 140.xxx / NeoPoros 109.xxx)
+// Catálogo Neodent Helix GM (Acqua 140.xxx / NeoPoros 109.xxx)
 const CAT={
   '3.5': {8:'943',10:'944',11.5:'945',13:'946',16:'947',18:'988'},
   '3.75':{8:'976',10:'977',11.5:'978',13:'979',16:'980',18:'981'},
@@ -816,7 +816,7 @@ function renderSide(){
     $('#r-gam').value=st.gamma; $('#v-gam').textContent=st.gamma.toFixed(2).replace('.',','); }
   const list=$('#imp-list');
   if(!st.implants.length){ list.innerHTML=`<p class="empty">Nenhum implante. Use a ferramenta <b>Implante</b> e clique na crista, na transversal ou na panorâmica.</p>`; }
-  else list.innerHTML = st.implants.map((im,i)=>{ const ev=evaluate(im); return `<button type="button" class="imp ${im.id===st.sel?'sel':''}" data-imp="${im.id}"><span class="imp-n">${i+1}</span><span class="imp-t">Ø ${dTxt(im.d)} × ${lTxt(im.L)} mm<small>${im.region?'região '+esc(im.region)+' · ':''}${impCode(im)} · ${im.surf}</small></span>${chip(ev.status,LABEL[ev.status])}</button>`; }).join('');
+  else list.innerHTML = st.implants.map((im,i)=>{ const ev=evaluate(im); return `<button type="button" class="imp ${im.id===st.sel?'sel':''}" data-imp="${im.id}"><span class="imp-n">${i+1}</span><span class="imp-t">Helix GM Ø ${dTxt(im.d)} × ${lTxt(im.L)} mm<small>${im.region?'região '+esc(im.region)+' · ':''}${impCode(im)} · ${im.surf}</small></span>${chip(ev.status,LABEL[ev.status])}</button>`; }).join('');
   $$('[data-imp]').forEach(b=>b.addEventListener('click',()=>{ st.sel=+b.dataset.imp; focusImplant(selImp()); }));
   const im=selImp(), ed=$('#imp-editor');
   if(!im){ ed.innerHTML=''; }
@@ -828,7 +828,7 @@ function renderSide(){
     const dOpts=DIAMS.map(d=>`<option value="${d}" ${d===im.d?'selected':''}>Ø ${dTxt(d)} mm</option>`).join('');
     const lOpts=lensFor(im.d).map(l=>`<option value="${l}" ${l===im.L?'selected':''}>${lTxt(l)} mm</option>`).join('');
     ed.innerHTML = `<div class="editor" style="margin-top:10px">
-      <div class="row" style="justify-content:space-between"><strong style="font-family:var(--f-display)">Implante ${idx}</strong>${chip(ev.status,LABEL[ev.status])}</div>
+      <div class="row" style="justify-content:space-between"><strong style="font-family:var(--f-display)">Implante ${idx}<span style="display:block;font-family:var(--f-body);font-weight:400;font-size:11px;color:var(--muted)">Neodent Helix GM</span></strong>${chip(ev.status,LABEL[ev.status])}</div>
       <div class="editor-grid">
         <label class="field" for="sel-d">Diâmetro<select id="sel-d">${dOpts}</select></label>
         <label class="field" for="sel-l">Comprimento<select id="sel-l">${lOpts}</select></label>
@@ -1156,7 +1156,7 @@ function openReport(){
   const td=(v,s)=>`<td${s?` class="st-${s}"`:''}>${v}</td>`;
   const tableRows=d.rows.map(r=>`<tr>${td(r.n)}${td(esc(r.im.region||'—'))}${td('Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L))}${td(r.im.surf)}${td(r.code)}${td(r.im.cover+' mm · '+COVER[r.im.cover])}${td(fmt(r.ev.angle,0)+'°')}${td(r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS)}${td(r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS)}${td(fmt(r.ev.bone,0)+'%',r.bS)}${td(stText(r.ev.status),r.ev.status)}</tr>`).join('');
   const cards=d.rows.map(r=>`<div class="rep-imp">${r.shot?`<img src="${r.shot.url}" alt="Corte do implante ${r.n}">`:'<div></div>'}<div><h4>Implante ${r.n}${r.im.region?' · região '+esc(r.im.region):''}</h4><dl>
-    <dt>Implante</dt><dd>Ø ${dTxt(r.im.d)} × ${lTxt(r.im.L)} mm</dd><dt>Superfície</dt><dd>${r.im.surf}</dd><dt>Código</dt><dd>${r.code}</dd><dt>Parafuso de cobertura</dt><dd>${r.im.cover} mm · ${COVER[r.im.cover]}</dd>
+    <dt>Implante</dt><dd>Helix GM Ø ${dTxt(r.im.d)} × ${lTxt(r.im.L)} mm</dd><dt>Superfície</dt><dd>${r.im.surf}</dd><dt>Código</dt><dd>${r.code}</dd><dt>Parafuso de cobertura</dt><dd>${r.im.cover} mm · ${COVER[r.im.cover]}</dd>
     <dt>Inclinação</dt><dd>${fmt(r.ev.angle,0)}°</dd><dt>Distância ao canal</dt><dd class="${r.nS?'st-'+r.nS:''}">${r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm'}</dd>
     <dt>Implante vizinho</dt><dd class="${r.iS?'st-'+r.iS:''}">${r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm'}</dd><dt>Superfície em osso</dt><dd class="st-${r.bS}">${fmt(r.ev.bone,0)}%</dd>
     <dt>Avaliação</dt><dd class="st-${r.ev.status}">${stText(r.ev.status)}</dd></dl></div></div>`).join('');
@@ -1169,11 +1169,11 @@ function openReport(){
       <label>Voxel<span class="ro">${d.voxel}</span></label>
     </div></section>
     ${d.pano?`<section><h3>Panorâmica reconstruída</h3><img class="shot" src="${d.pano.url}" alt="Panorâmica com os implantes numerados"></section>`:''}
-    <section><h3>Implantes selecionados</h3><div class="rep-table-wrap"><table class="rep-table"><tr><th>Nº</th><th>Região</th><th>Implante (mm)</th><th>Superfície</th><th>Código</th><th>Cobertura</th><th>Incl.</th><th>Canal</th><th>Vizinho</th><th>Osso</th><th>Avaliação</th></tr>${tableRows}</table></div></section>
+    <section><h3>Implantes selecionados</h3><div class="rep-table-wrap"><table class="rep-table"><tr><th>Nº</th><th>Região</th><th>Neodent Helix GM (mm)</th><th>Superfície</th><th>Código</th><th>Cobertura</th><th>Incl.</th><th>Canal</th><th>Vizinho</th><th>Osso</th><th>Avaliação</th></tr>${tableRows}</table></div></section>
     <section><h3>Cortes de cada implante</h3><div class="rep-imps">${cards}</div></section>
     ${d.three?`<section><h3>Reconstrução 3D</h3><img class="shot" src="${d.three.url}" alt="Reconstrução 3D com implantes"></section>`:''}
     <section><h3>Observações</h3><textarea id="rep-notes" rows="4" style="width:100%;box-sizing:border-box" placeholder="Justificativa da escolha, enxerto, componentes protéticos…">${esc(rep.notes)}</textarea></section>
-    <p class="rep-disc">Critérios: distância de 2 mm ou mais da borda do canal mandibular (${d.nerves} canal(is) marcado(s), raio ${fmt(st.nerveR)} mm); 3 mm ou mais entre implantes; 85% ou mais da superfície do implante acima do limiar ósseo (${d.thr}). Simulação para ensino: não substitui o software de planejamento nem gera guia cirúrgica. Medidas dependem da calibração do exame e da marcação do canal.</p>`;
+    <p class="rep-disc">Critérios: distância de 2 mm ou mais da borda do canal mandibular (${d.nerves} canal(is) marcado(s), raio ${fmt(st.nerveR)} mm); 3 mm ou mais entre implantes; 85% ou mais da superfície do implante acima do limiar ósseo (${d.thr}). Implantes da biblioteca Neodent Helix GM. Simulação para ensino e referência: nenhuma medida ou avaliação é absoluta e todas devem ser confirmadas pelo profissional no exame original e no software de planejamento. Não gera guia cirúrgica. Os resultados dependem da calibração do exame e da marcação do canal.</p>`;
   $('#rep-caso').addEventListener('input',e=>rep.caso=e.target.value);
   $('#rep-prof').addEventListener('input',e=>rep.prof=e.target.value);
   $('#rep-notes').addEventListener('input',e=>rep.notes=e.target.value);
@@ -1192,7 +1192,7 @@ async function buildPDF(){
   const PW=210, PH=297, M=14; let y=M;
   const navy=[3,82,140], mag=[227,0,122], ink=[11,45,72], grey=[90,107,125];
   const stCol={ok:[19,134,90],warn:[184,106,0],bad:[200,16,46]};
-  const footer=()=>{ doc.setFontSize(7); doc.setTextColor(...grey); doc.text('EXACT Odontologia Digital · Simulação para ensino: não substitui o software de planejamento nem gera guia cirúrgica.', M, PH-8); doc.text(String(doc.getNumberOfPages()), PW-M, PH-8, {align:'right'}); };
+  const footer=()=>{ doc.setFontSize(7); doc.setTextColor(...grey); doc.text('EXACT Odontologia Digital · Simulação para ensino e referência: valores não absolutos, confirmar no software de planejamento. Não gera guia cirúrgica.', M, PH-8); doc.text(String(doc.getNumberOfPages()), PW-M, PH-8, {align:'right'}); };
   const need=h=>{ if(y+h>PH-16){ footer(); doc.addPage(); y=M; } };
   const logo=await loadImg(LOGO_COLOR);
   if(logo) doc.addImage(logo,'PNG',M,y,48,48*logo.height/logo.width);
@@ -1205,7 +1205,7 @@ async function buildPDF(){
   const section=t=>{ need(10); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...mag); doc.text(t.toUpperCase(),M,y); doc.setFont('helvetica','normal'); y+=4; };
   if(d.pano){ const w=PW-2*M, h=Math.min(70,w*d.pano.h/d.pano.w), ww=h*d.pano.w/d.pano.h; need(h+14); section('Panorâmica reconstruída'); doc.addImage(d.pano.url,'JPEG',M+(w-ww)/2,y,ww,h); y+=h+8; }
   section('Implantes selecionados');
-  const cols=[['Nº',8],['Região',15],['Implante',24],['Superf.',18],['Código',17],['Cobertura',24],['Incl.',11],['Canal',17],['Vizinho',17],['Osso',12],['Aval.',19]];
+  const cols=[['Nº',8],['Região',15],['Helix GM',24],['Superf.',18],['Código',17],['Cobertura',24],['Incl.',11],['Canal',17],['Vizinho',17],['Osso',12],['Aval.',19]];
   const rowH=6.5; need(rowH*2);
   doc.setFontSize(7); doc.setTextColor(...grey); let x=M; cols.forEach(c=>{ doc.text(c[0].toUpperCase(),x+1,y+3.5); x+=c[1]; }); y+=5; doc.setDrawColor(...navy); doc.setLineWidth(0.5); doc.line(M,y,PW-M,y); y+=1;
   doc.setFontSize(8.5);
@@ -1221,14 +1221,14 @@ async function buildPDF(){
     if(r.shot) doc.addImage(r.shot.url,'JPEG',x0+3,rowTop+3,iw,ih);
     const tx=x0+iw+7; let ty=rowTop+7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text('Implante '+r.n+(r.im.region?' · região '+r.im.region:''),tx,ty); ty+=6;
     doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    const kv=[['Implante','Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)+' mm'],['Superfície',r.im.surf],['Código',r.code],['Cobertura',r.im.cover+' mm · '+COVER[r.im.cover]],['Inclinação',fmt(r.ev.angle,0)+'°'],['Canal',r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],['Vizinho',r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],['Osso',fmt(r.ev.bone,0)+'%',r.bS],['Avaliação',stText(r.ev.status),r.ev.status]];
+    const kv=[['Implante','Helix GM Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)+' mm'],['Superfície',r.im.surf],['Código',r.code],['Cobertura',r.im.cover+' mm · '+COVER[r.im.cover]],['Inclinação',fmt(r.ev.angle,0)+'°'],['Canal',r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],['Vizinho',r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],['Osso',fmt(r.ev.bone,0)+'%',r.bS],['Avaliação',stText(r.ev.status),r.ev.status]];
     kv.forEach(k=>{ doc.setTextColor(...grey); doc.text(k[0],tx,ty); doc.setTextColor(...(k[2]?stCol[k[2]]:ink)); doc.text(String(k[1]),x0+cw-3,ty,{align:'right'}); ty+=4.6; });
     rowMax=Math.max(rowMax,bh); col++; if(col===2){ col=0; y=rowTop+rowMax+5; } });
   if(col===1) y=rowTop+rowMax+5;
   if(d.three){ const w=PW-2*M, h=Math.min(85,w*d.three.h/d.three.w), ww=h*d.three.w/d.three.h; need(h+14); section('Reconstrução 3D'); doc.addImage(d.three.url,'JPEG',M+(w-ww)/2,y,ww,h); y+=h+8; }
   if(rep.notes.trim()){ section('Observações'); doc.setFontSize(9); doc.setTextColor(...ink); const lines=doc.splitTextToSize(rep.notes,PW-2*M); need(lines.length*4.5); doc.text(lines,M,y+2); y+=lines.length*4.5+6; }
   section('Critérios'); doc.setFontSize(8); doc.setTextColor(...grey);
-  const crit=doc.splitTextToSize(`Distância de 2 mm ou mais da borda do canal mandibular (${d.nerves} canal(is) marcado(s), raio ${fmt(st.nerveR)} mm); 3 mm ou mais entre implantes; 85% ou mais da superfície do implante acima do limiar ósseo (${d.thr}). Medidas dependem da calibração do exame e da marcação do canal.`, PW-2*M);
+  const crit=doc.splitTextToSize(`Distância de 2 mm ou mais da borda do canal mandibular (${d.nerves} canal(is) marcado(s), raio ${fmt(st.nerveR)} mm); 3 mm ou mais entre implantes; 85% ou mais da superfície do implante acima do limiar ósseo (${d.thr}). Implantes da biblioteca Neodent Helix GM. Valores de referência para ensino, não absolutos: confirmar no exame original e no software de planejamento. Medidas dependem da calibração do exame e da marcação do canal.`, PW-2*M);
   need(crit.length*4); doc.text(crit,M,y+2);
   footer();
   return doc.output('blob');
