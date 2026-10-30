@@ -277,7 +277,7 @@ function segSegDist(p1,q1,p2,q2){
 const st = {
   vol:null, wl:{w:2600,l:700}, gamma:1.2, filter:'realce', filterK:0.6, cur:[0,0,0], mode:'plan', tool:'nav',
   curve:{pts:[], S:null, len:0, z:0, drawing:false}, crossIdx:0, panoSlab:8, panoOff:0, crossW:32,
-  implants:[], sel:null, nerves:[], activeNerve:-1, nerveR:1.2, boneThr:400, boneOpacity:0.6,
+  implants:[], sel:null, nerves:[], activeNerve:-1, nerveR:1.2, boneThr:400, boneOpacity:1,
   measures:[], idSeq:1, isDemo:false
 };
 // Catálogo linha GM (Acqua 140.xxx / NeoPoros 109.xxx)
@@ -878,6 +878,11 @@ $('#r-bri').addEventListener('input',e=>{ const R=wlRange(), t=+e.target.value/1
 $('#r-con').addEventListener('input',e=>{ const R=wlRange(), t=+e.target.value/1000; st.wl.w = R.wmax - t*(R.wmax-R.wmin); invalidate({three:false}); });
 $('#r-gam').addEventListener('input',e=>{ st.gamma=+e.target.value; invalidate({three:false}); });
 function autoWL(){ const v=st.vol; if(!v) return; const lo=v.p40, hi=v.hi; st.wl={w:Math.max(50,hi-lo), l:(hi+lo)/2}; st.gamma=1.2; }
+function otsuThr(v){ const d=v.data, n=d.length, step=Math.max(1,Math.floor(n/300000)), lo=v.p40, hi=v.vmax, B=256, hist=new Float64Array(B); let tot=0;
+  for(let i=0;i<n;i+=step){ const x=d[i]; if(x<lo||x>hi) continue; hist[Math.min(B-1,Math.floor((x-lo)/(hi-lo)*B))]++; tot++; }
+  let sum=0; for(let i=0;i<B;i++) sum+=i*hist[i]; let sB=0,wB=0,best=0,bi=B/2;
+  for(let i=0;i<B;i++){ wB+=hist[i]; if(!wB) continue; const wF=tot-wB; if(!wF) break; sB+=i*hist[i]; const mB=sB/wB, mF=(sum-sB)/wF, bt=wB*wF*(mB-mF)*(mB-mF); if(bt>best){best=bt;bi=i;} }
+  return Math.round((lo+(bi+0.5)/B*(hi-lo))/10)*10; }
 function volStats(v){ const d=v.data, n=d.length, step=Math.max(1,Math.floor(n/400000)); const arr=[]; for(let i=0;i<n;i+=step) arr.push(d[i]); arr.sort((a,b)=>a-b);
   const pct=f=>arr[Math.min(arr.length-1,Math.floor(arr.length*f))]; v.lo=pct(0.02); v.hi=pct(0.998); v.p90=pct(0.9); v.p97=pct(0.97); v.p40=pct(0.4); v.vmin=pct(0.001); v.vmax=pct(0.9995); }
 
@@ -890,8 +895,10 @@ function init3D(){
   const renderer=new THREE.WebGLRenderer({canvas:c3d, antialias:true});
   renderer.setPixelRatio(window.devicePixelRatio||1); renderer.setClearColor(0x02080F,1);
   const scene=new THREE.Scene(); const cam=new THREE.PerspectiveCamera(32,1,1,4000); cam.up.set(0,0,1);
-  scene.add(new THREE.HemisphereLight(0xffffff,0x1b2a3a,0.75));
-  const dl=new THREE.DirectionalLight(0xffffff,0.75); dl.position.set(0.3,-1,0.6); cam.add(dl); scene.add(cam);
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  scene.add(new THREE.HemisphereLight(0xffffff,0x1a2430,0.32));
+  const dl=new THREE.DirectionalLight(0xfff6ea,0.85); dl.position.set(-0.5,0.8,0.9); cam.add(dl);
+  const fl=new THREE.DirectionalLight(0xbfd6ff,0.28); fl.position.set(0.9,-0.4,0.3); cam.add(fl); scene.add(cam);
   const groupImp=new THREE.Group(), groupNerve=new THREE.Group(); scene.add(groupImp); scene.add(groupNerve);
   const planeMat=new THREE.MeshBasicMaterial({color:0xEC4B8E, transparent:true, opacity:0.18, side:THREE.DoubleSide, depthWrite:false});
   const plane=new THREE.Mesh(new THREE.PlaneGeometry(1,1), planeMat); plane.matrixAutoUpdate=false; scene.add(plane);
@@ -943,22 +950,46 @@ function build3D(){
   const v=st.vol; if(!v) return; if(!init3D()) return;
   $('#msg3d').hidden=false; $('#msg3d').textContent='Gerando reconstrução 3D…';
   setTimeout(()=>{
-    const f=Math.max(1,Math.ceil(Math.max(v.nx,v.ny,v.nz)/150)); const gx=Math.ceil(v.nx/f), gy=Math.ceil(v.ny/f), gz=Math.ceil(v.nz/f);
-    const g=new Float32Array(gx*gy*gz), nxy=v.nx*v.ny;
+    const f=Math.max(1,Math.ceil(Math.max(v.nx,v.ny,v.nz)/200)); const gx=Math.ceil(v.nx/f), gy=Math.ceil(v.ny/f), gz=Math.ceil(v.nz/f), gxy=gx*gy;
+    let g=new Float32Array(gx*gy*gz); const nxy=v.nx*v.ny;
     for(let k=0;k<gz;k++) for(let j=0;j<gy;j++) for(let i=0;i<gx;i++){ let acc=0,c=0;
       for(let kk=k*f;kk<Math.min(v.nz,k*f+f);kk++) for(let jj=j*f;jj<Math.min(v.ny,j*f+f);jj++) for(let ii=i*f;ii<Math.min(v.nx,i*f+f);ii++){ acc+=v.data[kk*nxy+jj*v.nx+ii]; c++; }
-      // pad borders as air so the surface closes
-      g[k*gx*gy+j*gx+i] = (i===0||j===0||k===0||i===gx-1||j===gy-1||k===gz-1) ? AIR : acc/c; }
+      g[k*gxy+j*gx+i]=acc/c; }
+    // CBCT: área fora do cilindro do FOV costuma ser preenchida com valor constante -> remove o anel de borda
+    { let m=0,m2=0,n=0; const cw=Math.max(2,Math.round(gx*0.06));
+      for(let k=0;k<gz;k+=2) for(let j=0;j<cw;j++) for(let i=0;i<cw;i++){ const val=g[k*gxy+j*gx+i]; m+=val; m2+=val*val; n++; }
+      m/=n; const sd=Math.sqrt(Math.max(0,m2/n-m*m));
+      if(sd<25){ const cx=(gx-1)/2, cy=(gy-1)/2, R=Math.min(gx,gy)/2-2.5, R2=R*R;
+        for(let j=0;j<gy;j++) for(let i=0;i<gx;i++){ if((i-cx)*(i-cx)+(j-cy)*(j-cy)>R2) for(let k=0;k<gz;k++) g[k*gxy+j*gx+i]=AIR; } } }
+    // suavização 3D (1-2-1) para tirar o ruído da superfície
+    { const t=new Float32Array(g.length);
+      const pass=(src,dst,st1,len,cnt)=>{ for(let idx=0;idx<src.length;idx++){ const p=Math.floor(idx/st1)%len; const a=p>0?src[idx-st1]:src[idx], c=p<len-1?src[idx+st1]:src[idx]; dst[idx]=(a+2*src[idx]+c)/4; } };
+      pass(g,t,1,gx); pass(t,g,gx,gy); pass(g,t,gxy,gz); g=t; }
+    for(let k=0;k<gz;k++) for(let j=0;j<gy;j++) for(let i=0;i<gx;i++) if(i===0||j===0||k===0||i===gx-1||j===gy-1||k===gz-1) g[k*gxy+j*gx+i]=AIR;
     const res=surfaceNets(g,[gx,gy,gz],st.boneThr);
+    const nv=res.verts.length/3; let idx=res.idx;
+    // remove fragmentos soltos (ruído, artefato metálico)
+    { const par=new Int32Array(nv); for(let i=0;i<nv;i++) par[i]=i; const fd=x=>{ while(par[x]!==x){ par[x]=par[par[x]]; x=par[x]; } return x; };
+      for(let i=0;i<idx.length;i+=3){ const a=fd(idx[i]), b=fd(idx[i+1]), c=fd(idx[i+2]); if(a!==b) par[a]=b; const b2=fd(b); if(c!==b2) par[c]=b2; }
+      const cnt=new Int32Array(nv); for(let i=0;i<nv;i++) cnt[fd(i)]++; let mx=0; for(let i=0;i<nv;i++) if(cnt[i]>mx) mx=cnt[i];
+      const minC=Math.max(150, mx*0.004); const keep=[]; for(let i=0;i<idx.length;i+=3){ if(cnt[fd(idx[i])]>=minC) keep.push(idx[i],idx[i+1],idx[i+2]); } idx=keep; }
     const pos=new Float32Array(res.verts.length); for(let i=0;i<res.verts.length;i+=3){ pos[i]=(res.verts[i]*f+(f-1)/2)*v.sx; pos[i+1]=(res.verts[i+1]*f+(f-1)/2)*v.sy; pos[i+2]=(res.verts[i+2]*f+(f-1)/2)*v.sz; }
+    // suavização da malha (Taubin, mantém o volume)
+    { const deg=new Int32Array(nv+1); for(let i=0;i<idx.length;i+=3){ deg[idx[i]]+=2; deg[idx[i+1]]+=2; deg[idx[i+2]]+=2; }
+      const off=new Int32Array(nv+1); for(let i=0;i<nv;i++) off[i+1]=off[i]+deg[i]; const fill=off.slice(0,nv), nb=new Int32Array(off[nv]);
+      for(let i=0;i<idx.length;i+=3){ const a=idx[i],b=idx[i+1],c=idx[i+2]; nb[fill[a]++]=b; nb[fill[a]++]=c; nb[fill[b]++]=a; nb[fill[b]++]=c; nb[fill[c]++]=a; nb[fill[c]++]=b; }
+      const tmp=new Float32Array(pos.length);
+      const step=lam=>{ for(let i=0;i<nv;i++){ const o0=off[i], o1=off[i+1]; if(o1===o0){ tmp[3*i]=pos[3*i]; tmp[3*i+1]=pos[3*i+1]; tmp[3*i+2]=pos[3*i+2]; continue; } let sx=0,sy=0,sz=0; for(let q=o0;q<o1;q++){ const n=nb[q]; sx+=pos[3*n]; sy+=pos[3*n+1]; sz+=pos[3*n+2]; } const m=1/(o1-o0);
+          tmp[3*i]=pos[3*i]+lam*(sx*m-pos[3*i]); tmp[3*i+1]=pos[3*i+1]+lam*(sy*m-pos[3*i+1]); tmp[3*i+2]=pos[3*i+2]+lam*(sz*m-pos[3*i+2]); } pos.set(tmp); };
+      for(let it=0;it<3;it++){ step(0.5); step(-0.53); } }
     const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    geo.setIndex(new THREE.BufferAttribute(pos.length/3>65535?new Uint32Array(res.idx):new Uint16Array(res.idx),1)); geo.computeVertexNormals();
+    geo.setIndex(new THREE.BufferAttribute(nv>65535?new Uint32Array(idx):new Uint16Array(idx),1)); geo.computeVertexNormals();
     if(R3.bone){ R3.scene.remove(R3.bone); R3.bone.geometry.dispose(); }
-    const mat=new THREE.MeshStandardMaterial({color:0xE8E1D2, roughness:0.75, metalness:0.0, side:THREE.DoubleSide});
+    const mat=new THREE.MeshStandardMaterial({color:0xCFC2AA, roughness:0.55, metalness:0.0, side:THREE.DoubleSide});
     R3.bone=new THREE.Mesh(geo,mat); R3.scene.add(R3.bone); applyOpacity();
-    R3.target.set(v.X/2,v.Y/2,v.Z/2); if(!R3.placed){ R3.rad=Math.max(v.X,v.Y,v.Z)*2.4; R3.placed=true; }
+    R3.target.set(v.X/2,v.Y/2,v.Z/2); if(!R3.placed){ R3.rad=Math.max(v.X,v.Y,v.Z)*1.8; R3.placed=true; }
     size3D(); placeCam(); sync3D();
-    $('#msg3d').hidden=true; $('#info3d').textContent=`${Math.round(res.idx.length/3/1000)} mil triângulos · arraste gira · Shift+arraste move · roda zoom`;
+    $('#msg3d').hidden=true; $('#info3d').textContent=`${Math.round(idx.length/3/1000)} mil triângulos · arraste gira · Shift+arraste move · roda zoom`;
   },30);
 }
 function applyOpacity(){ if(!R3||!R3.bone) return; const m=R3.bone.material, o=st.boneOpacity; m.opacity=o; m.transparent=o<0.99; m.depthWrite=o>=0.99; m.needsUpdate=true; }
@@ -972,10 +1003,14 @@ function sync3D(){
     const mat=new THREE.MeshStandardMaterial({color:col, metalness:0.35, roughness:0.35, side:THREE.DoubleSide});
     const grp=new THREE.Group(); grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof,32),mat));
     if(im.cover>0){ const cap=new THREE.Mesh(new THREE.CylinderGeometry(im.d*0.36,im.d*0.36,im.cover,24), new THREE.MeshStandardMaterial({color:0xD6B23C, metalness:0.5, roughness:0.3})); cap.position.y=im.L/2+im.cover/2; grp.add(cap); }
+    const ghost=new THREE.Mesh(grp.children[0].geometry.clone(), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.45, depthWrite:false, depthFunc:THREE.GreaterDepth}));
+    ghost.renderOrder=2; grp.add(ghost);
     grp.position.set(im.c[0],im.c[1],im.c[2]); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(im.a[0],im.a[1],im.a[2])); G.add(grp); });
   const N=R3.groupNerve; while(N.children.length){ const c=N.children.pop(); c.geometry.dispose(); c.material.dispose(); }
   st.nerves.forEach(pl=>{ if(pl.length<2) return; const curve=new THREE.CatmullRomCurve3(pl.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
-    const m=new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(16,pl.length*8), st.nerveR, 10, false), new THREE.MeshStandardMaterial({color:0xF2C14E, roughness:0.5})); N.add(m); });
+    const tg=new THREE.TubeGeometry(curve, Math.max(16,pl.length*8), st.nerveR, 10, false);
+    N.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({color:0xF2C14E, roughness:0.5})));
+    const gh=new THREE.Mesh(tg.clone(), new THREE.MeshBasicMaterial({color:0xF2C14E, transparent:true, opacity:0.4, depthWrite:false, depthFunc:THREE.GreaterDepth})); gh.renderOrder=2; N.add(gh); });
   const o=st.mode==='plan'?crossFrame():null;
   if(o&&st.vol){ const W=st.crossW, H=st.vol.Z; const xa=new THREE.Vector3(o.nx,o.ny,0), ya=new THREE.Vector3(0,0,1), za=new THREE.Vector3(o.tx,o.ty,0);
     R3.plane.matrix.makeBasis(xa,ya,za).scale(new THREE.Vector3(W,H,1)).setPosition(o.x,o.y,H/2); R3.plane.visible=true; }
@@ -1030,7 +1065,7 @@ async function loadFiles(files){
   }
   const vol={nx,ny,nz,sx,sy,sz,data,name: desc||name||'Tomografia', isDemo:false};
   volStats(vol); setVolume(vol); st.isDemo=false;
-  autoWL(); st.boneThr=Math.round(vol.lo+(vol.p97-vol.lo)*0.55); st.panoSlab=10; st.panoOff=0;
+  autoWL(); st.boneThr=otsuThr(vol); st.panoSlab=10; st.panoOff=0;
   st.mode='plan'; setMode('plan'); setTool('curve'); st.cur[2]=vol.Z*0.45;
   hideOverlay(); if(compressed) flash(`${compressed} arquivos comprimidos foram ignorados.`);
   if(R3) R3.placed=false; build3D(); invalidate();
