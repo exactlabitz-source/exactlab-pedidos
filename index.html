@@ -310,12 +310,28 @@ function compParts(im){ const c=im.comp||{type:'none'}, code=compCode(im)||'—'
   if(c.type==='cover') return ['Cobertura', hTxt(c.h)+' mm', code];
   if(c.type==='heal') return ['Cicatrizador', 'Ø'+hTxt(c.d)+' × '+hTxt(c.h)+' mm', code];
   return ['—','—','—']; }
+function compRad(im,z){ // z = altura acima da plataforma
+  const c=im.comp||{type:'none'}, g=compGeo(im), h=g.h; if(z<0||z>h) return 0; let r;
+  if(c.type==='heal'){ const f=Math.min(1,z/(0.55*h)), e=1-Math.pow(1-f,2); r=g.rb+(g.rt-g.rb)*e; }
+  else r=g.rt;
+  const rnd=Math.min(0.3,h*0.3); if(z>h-rnd){ const q=(z-(h-rnd))/rnd; r-=rnd*(1-Math.sqrt(Math.max(0,1-q*q))); }
+  return r; }
 function compGeo(im){ const c=im.comp||{type:'none'};
-  if(c.type==='cover') return {h:c.h>0?c.h:0.4, rb:Math.min(1.6,im.d/2), rt:Math.min(1.6,im.d/2), col:[214,178,60], hex:0xD6B23C};
-  if(c.type==='heal') return {h:c.h, rb:Math.min(1.75,c.d/2), rt:c.d/2, col:[232,200,96], hex:0xE8C860};
+  if(c.type==='cover') return {h:c.h>0?c.h:0.5, rb:Math.min(1.65,im.d/2), rt:Math.min(1.65,im.d/2), col:[218,180,70], hex:0xD8B04A};
+  if(c.type==='heal') return {h:c.h, rb:Math.min(1.75,c.d/2), rt:c.d/2, col:[226,190,84], hex:0xE2BE54};
   return {h:0, rb:0, rt:0, col:[0,0,0], hex:0}; }
 const PITCH=0.9;
-function impRadius(im,t){ const R=im.d/2; let r = t<0.45 ? R*(0.6+0.4*t/0.45) : R; if(t*im.L<0.3) r*=0.85; return r; }
+// Forma Helix GM (ilustrativa): corpo cônico no terço apical, rosca dupla, câmaras apicais, colar liso
+const HX={pitch:1.1, lead:2.2, collar:0.7};
+function hxOuter(L,R,s){ const u=s/L; let r = u>0.5 ? R : R*(0.6+0.4*Math.pow(u/0.5,0.85)); if(s<0.6) r*=0.5+0.5*Math.sqrt(Math.max(0,s/0.6)); if(s>L-HX.collar) r=R*0.985; return r; }
+function hxDepth(L,R,s){ if(s<0.25||s>L-HX.collar) return 0; const u=s/L; let dp=Math.min(0.42,R*0.17)*(1.15-0.35*u); if(s<0.8) dp*= (s-0.25)/0.55; if(s>L-HX.collar-0.4) dp*=(L-HX.collar-s)/0.4; return Math.max(0,dp); }
+function hxTooth(ph){ return ph<0.32 ? ph/0.32 : (ph<0.5 ? 1 : (ph<0.86 ? 1-(ph-0.5)/0.36 : 0)); }
+function hxR(L,R,s,th){ const out=hxOuter(L,R,s), dp=hxDepth(L,R,s); if(dp<=0) return out;
+  let ph=(s + th/(2*Math.PI)*HX.lead)/HX.pitch; ph-=Math.floor(ph);
+  let r=out-dp+dp*hxTooth(ph);
+  if(s<0.38*L){ for(let k=0;k<3;k++){ let dt=th-k*2*Math.PI/3; dt=Math.atan2(Math.sin(dt),Math.cos(dt)); if(Math.abs(dt)<0.26){ r-= dp*1.25*(1-s/(0.38*L))*(1-Math.abs(dt)/0.26); } } }
+  return r; }
+function impRadius(im,t){ return hxOuter(im.L, im.d/2, t*im.L); }
 
 /* ---------------- Volume sampling ---------------- */
 function sampler(vol){
@@ -591,7 +607,7 @@ function renderImage(p){
   applyFilter(Gb, p.tmp, w, h, st.filter, st.filterK);
   const W=st.wl.w, lo=st.wl.l-W/2, sc=1023/W;
   const LUT=new Uint8Array(1024); for(let i=0;i<1024;i++) LUT[i]=Math.round(255*Math.pow(i/1023, st.gamma));
-  const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); const cp=compGeo(im); return {a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:cp.h,crb:cp.rb,crt:cp.rt,cc:cp.col,sel:im.id===st.sel,bad:ev.status==='bad'};});
+  const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); const cp=compGeo(im); const ax=im.a, rf=Math.abs(ax[2])<0.9?[0,0,1]:[1,0,0], e1=norm(cross(ax,rf)), e2=cross(ax,e1); return {im,a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:cp.h,cc:cp.col,e1,e2,sel:im.id===st.sel,bad:ev.status==='bad'};});
   const segs=[]; st.nerves.forEach(pl=>{ for(let i=0;i<pl.length-1;i++) segs.push([pl[i],pl[i+1]]); });
   const NR=st.nerveR, hasOv=imps.length||segs.length, edge=q*1.1;
   o=0;
@@ -611,12 +627,15 @@ function renderImage(p){
           const dx=Bp[0]-A[0], dy=Bp[1]-A[1], dz=Bp[2]-A[2], l2=dx*dx+dy*dy+dz*dz; const t=l2?((x-A[0])*dx+(y-A[1])*dy+(z-A[2])*dz)/l2:0;
           const len=I.L, sAx=t*len; if(t<0||sAx>len+I.cv) continue;
           const ex=A[0]+dx*t-x, ey=A[1]+dy*t-y, ez=A[2]+dz*t-z, d=Math.sqrt(ex*ex+ey*ey+ez*ez);
-          if(sAx>len){ const rr=I.crb+(I.crt-I.crb)*Math.min(1,(sAx-len)/Math.max(0.6,I.cv*0.6)); if(d<rr){ const al=d>rr-edge?0.95:0.55; R=R*(1-al)+I.cc[0]*al; G=G*(1-al)+I.cc[1]*al; B=B*(1-al)+I.cc[2]*al; break; } continue; }
-          let ro=I.r*(t<0.45?(0.6+0.4*t/0.45):1); if(sAx<0.3) ro*=0.85;
-          if(d<ro){ const core=ro*0.8; let fill=d<core||sAx>len-0.6, thr=false;
-            if(!fill){ const ph=(sAx%PITCH)/PITCH; fill = ph < 1-(d-core)/(ro-core)*0.85; thr=fill; }
-            if(fill){ const cc=I.bad?COL.bad:(I.sel?COL.impSel:COL.imp); const capE=Math.min(sAx,len-sAx);
-              const al=(d>ro-edge||capE<edge)?1:(thr?0.75:(I.sel?0.42:0.3)); R=R*(1-al)+cc[0]*al; G=G*(1-al)+cc[1]*al; B=B*(1-al)+cc[2]*al; break; } } }
+          if(sAx>len){ const rr=compRad(I.im,sAx-len); if(d<rr){ const ol=d>rr-edge*1.2; const al=ol?1:0.78; const c2=ol?[140,105,25]:I.cc; R=R*(1-al)+c2[0]*al; G=G*(1-al)+c2[1]*al; B=B*(1-al)+c2[2]*al; break; } continue; }
+          const ro=hxOuter(len,I.r,sAx); if(d>=ro) continue;
+          const vx=x-(A[0]+dx*t), vy=y-(A[1]+dy*t), vz=z-(A[2]+dz*t); const th=Math.atan2(vx*I.e2[0]+vy*I.e2[1]+vz*I.e2[2], vx*I.e1[0]+vy*I.e1[1]+vz*I.e1[2]);
+          const rr=hxR(len,I.r,sAx,th); if(d>=rr) continue;
+          const dp=hxDepth(len,I.r,sAx), core=ro-dp, capE=Math.min(sAx,len-sAx);
+          const ol=d>rr-edge*1.2||capE<edge; const thr=d>core;
+          const oc=I.bad?COL.bad:(I.sel?[255,120,180]:COL.imp);
+          const c2=ol?oc:(thr?[228,232,238]:[196,203,212]); const al=ol?1:(thr?0.85:(I.sel?0.62:0.5));
+          R=R*(1-al)+c2[0]*al; G=G*(1-al)+c2[1]*al; B=B*(1-al)+c2[2]*al; break; }
       }
       const oo=o*4; D[oo]=R; D[oo+1]=G; D[oo+2]=B; D[oo+3]=255;
     }
@@ -923,7 +942,7 @@ $('#r-slab').addEventListener('input',e=>{st.panoSlab=+e.target.value; invalidat
 $('#r-off').addEventListener('input',e=>{st.panoOff=+e.target.value; invalidate({three:false});});
 $('#r-thr').addEventListener('input',e=>{st.boneThr=+e.target.value; need.side=true; $('#v-thr').textContent=st.boneThr; invalidate({three:false}); mark3dStale();});
 $('#r-thr').addEventListener('change',()=>build3D());
-$('#r-op').addEventListener('input',e=>{st.boneOpacity=+e.target.value; $('#v-op').textContent=Math.round(st.boneOpacity*100)+'%'; applyOpacity(); render3D();});
+$('#r-op').addEventListener('input',e=>{st.boneOpacity=+e.target.value; $('#v-op').textContent=Math.round(st.boneOpacity*100)+'%'; applyOpacity(); sync3D();});
 $('#btn-3d').addEventListener('click',()=>build3D());
 $('#btn-nerve-new').addEventListener('click',()=>{ setTool('nerve'); st.activeNerve=-1; flash('Clique no centro do canal na panorâmica, ponto a ponto. Duplo clique termina.'); });
 $('#btn-nerve-clear').addEventListener('click',()=>{ st.nerves=[]; st.activeNerve=-1; invalidate(); });
@@ -1052,18 +1071,38 @@ function build3D(){
   },30);
 }
 function applyOpacity(){ if(!R3||!R3.bone) return; const m=R3.bone.material, o=st.boneOpacity; m.opacity=o; m.transparent=o<0.99; m.depthWrite=o>=0.99; m.needsUpdate=true; }
+const HXCACHE=new Map();
+function helixGeo(d,L){ const key=d+'|'+L; if(HXCACHE.has(key)) return HXCACHE.get(key);
+  const R=d/2, ns=Math.ceil(L/0.05), nt=72, pos=[], idx=[];
+  const rows=[]; // cada linha: {y, rf(th)}
+  rows.push({y:-L/2, rf:()=>0});
+  for(let i=1;i<=ns;i++){ const sAx=i/ns*L; rows.push({y:sAx-L/2, rf:th=>hxR(L,R,sAx,th)}); }
+  const rc=R*0.985; rows.push({y:L/2, rf:()=>rc*0.97}); rows.push({y:L/2, rf:()=>1.05}); rows.push({y:L/2-0.9, rf:()=>1.05}); rows.push({y:L/2-0.9, rf:()=>0});
+  rows.forEach(rw=>{ for(let j=0;j<=nt;j++){ const th=j/nt*Math.PI*2, r=rw.rf(th); pos.push(r*Math.cos(th), rw.y, r*Math.sin(th)); } });
+  for(let i=0;i<rows.length-1;i++) for(let j=0;j<nt;j++){ const a=i*(nt+1)+j, b=a+1, c=a+nt+1, e=c+1; idx.push(a,c,b, b,c,e); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals(); g.userData.cached=true;
+  HXCACHE.set(key,g); return g; }
+const ENVCACHE=new Map();
+function envelopeGeo(d,L){ const key=d+'|'+L; if(ENVCACHE.has(key)) return ENVCACHE.get(key); const R=d/2, pts=[new THREE.Vector2(0.001,-L/2)];
+  for(let i=1;i<=40;i++){ const sAx=i/40*L; pts.push(new THREE.Vector2(hxOuter(L,R,sAx)*0.96, sAx-L/2)); } pts.push(new THREE.Vector2(0.001,L/2));
+  const g=new THREE.LatheGeometry(pts,40); g.userData.cached=true; ENVCACHE.set(key,g); return g; }
+function compMesh(im){ const c=im.comp||{type:'none'}; if(c.type==='none') return null; const g=compGeo(im), h=g.h, L=im.L;
+  const prof=[new THREE.Vector2(0.001,0)]; const N=18; for(let i=0;i<=N;i++){ const z=i/N*h; prof.push(new THREE.Vector2(Math.max(0.05,compRad(im,Math.min(z,h-1e-4))), z)); }
+  const sock=0.62; prof.push(new THREE.Vector2(sock,h)); prof.push(new THREE.Vector2(sock,h-0.55)); prof.push(new THREE.Vector2(0.001,h-0.55));
+  const grp=new THREE.Group();
+  const m=new THREE.Mesh(new THREE.LatheGeometry(prof,48), new THREE.MeshStandardMaterial({color:g.hex, metalness:0.5, roughness:0.28, side:THREE.DoubleSide})); grp.add(m);
+  const hexm=new THREE.Mesh(new THREE.CylinderGeometry(sock*0.98,sock*0.98,0.04,6), new THREE.MeshStandardMaterial({color:0x4a3a12, roughness:0.6})); hexm.position.y=h-0.53; grp.add(hexm);
+  grp.position.y=L/2; return grp; }
 function sync3D(){
   if(!R3) return;
-  const G=R3.groupImp; while(G.children.length){ const c=G.children.pop(); c.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); }); }
+  const G=R3.groupImp; while(G.children.length){ const c=G.children.pop(); c.traverse(o=>{ if(o.geometry&&!o.geometry.userData.cached) o.geometry.dispose(); if(o.material) o.material.dispose(); }); }
   st.implants.forEach(im=>{ const ev=evaluate(im); const col= ev.status==='bad'?0xFF5A5F:(im.id===st.sel?0xFF8CBE:0xEC4B8E);
-    const prof=[new THREE.Vector2(0,-im.L/2)]; const steps=Math.round(im.L/(PITCH/2));
-    for(let i=0;i<=steps;i++){ const sAx=i*PITCH/2, t=sAx/im.L, ro=impRadius(im,t), top=sAx>im.L-0.6; prof.push(new THREE.Vector2(top||i%2===0?ro:ro*0.8, sAx-im.L/2)); }
-    prof.push(new THREE.Vector2(im.d/2,im.L/2)); prof.push(new THREE.Vector2(im.d*0.18,im.L/2)); prof.push(new THREE.Vector2(im.d*0.18,im.L/2-0.8)); prof.push(new THREE.Vector2(0,im.L/2-0.8));
-    const mat=new THREE.MeshStandardMaterial({color:col, metalness:0.35, roughness:0.35, side:THREE.DoubleSide});
-    const grp=new THREE.Group(); grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof,32),mat));
-    { const cp=compGeo(im); if(cp.h>0){ const rt=cp.rt, rb=cp.rb; const cap=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,cp.h,28), new THREE.MeshStandardMaterial({color:cp.hex, metalness:0.5, roughness:0.3})); cap.position.y=im.L/2+cp.h/2; grp.add(cap); } }
-    const ghost=new THREE.Mesh(grp.children[0].geometry.clone(), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.45, depthWrite:false, depthFunc:THREE.GreaterDepth}));
-    ghost.renderOrder=2; grp.add(ghost);
+    const geo=helixGeo(im.d,im.L);
+    const mat=new THREE.MeshStandardMaterial({color:0xCDD3DB, metalness:0.55, roughness:0.3, emissive: ev.status==='bad'?0x5a0a0e:(im.id===st.sel?0x3a0d22:0x000000)});
+    const grp=new THREE.Group(); grp.add(new THREE.Mesh(geo,mat));
+    const cg=compMesh(im); if(cg) grp.add(cg);
+    if(st.boneOpacity>=0.99){ const ghost=new THREE.Mesh(envelopeGeo(im.d,im.L), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.45, depthWrite:false, depthFunc:THREE.GreaterDepth}));
+      ghost.renderOrder=2; grp.add(ghost); }
     grp.position.set(im.c[0],im.c[1],im.c[2]); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(im.a[0],im.a[1],im.a[2])); G.add(grp); });
   const N=R3.groupNerve; while(N.children.length){ const c=N.children.pop(); c.geometry.dispose(); c.material.dispose(); }
   st.nerves.forEach(pl=>{ if(pl.length<2) return; const curve=new THREE.CatmullRomCurve3(pl.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
