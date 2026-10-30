@@ -153,14 +153,11 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
     <div class="group">
       <label class="btn primary" for="file-dir">Abrir tomografia</label>
       <input id="file-dir" type="file" webkitdirectory multiple hidden>
-      <label class="btn" for="file-files">Arquivos .dcm</label>
-      <input id="file-files" type="file" multiple accept=".dcm,application/dicom,*/*" hidden>
-      <button class="btn" id="btn-demo" type="button">Exemplo</button>
     </div>
     <div class="sep"></div>
     <div class="seg" role="tablist" aria-label="Modo">
       <button id="mode-plan" type="button" class="on">Planejamento</button>
-      <button id="mode-mpr" type="button">MPR</button>
+      <button id="mode-mpr" type="button" title="Reconstrução multiplanar: axial, coronal e sagital">MPR · 3 planos</button>
     </div>
     <div class="group" role="toolbar" aria-label="Ferramentas">
       <button class="btn small on" data-tool="nav" type="button">Navegar</button>
@@ -187,6 +184,26 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
       </section>
 
       <section>
+        <h2>Imagem</h2>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label class="field" for="r-bri"><span class="field-top"><span>Brilho</span><span class="val" id="v-bri"></span></span><input type="range" id="r-bri" min="0" max="1000" step="1"></label>
+          <label class="field" for="r-con"><span class="field-top"><span>Contraste</span><span class="val" id="v-con"></span></span><input type="range" id="r-con" min="0" max="1000" step="1"></label>
+          <label class="field" for="r-gam"><span class="field-top"><span>Tons de cinza (gama)</span><span class="val" id="v-gam"></span></span><input type="range" id="r-gam" min="0.5" max="2.5" step="0.05"></label>
+          <div class="row">
+            <button class="btn small" data-wl="auto" type="button">Automático</button>
+            <button class="btn small" data-wl="bone" type="button">Osso</button>
+            <button class="btn small" data-wl="dark" type="button">Mais escuro</button>
+            <span class="pane-info" id="wl-read" style="margin-left:auto"></span>
+          </div>
+          <label class="field" for="r-slab"><span class="field-top"><span>Espessura da panorâmica</span><span class="val" id="v-slab"></span></span><input type="range" id="r-slab" min="0" max="20" step="1"></label>
+          <label class="field" for="r-off"><span class="field-top"><span>Deslocar panorâmica (V/L)</span><span class="val" id="v-off"></span></span><input type="range" id="r-off" min="-10" max="10" step="0.5"></label>
+          <label class="field" for="r-thr"><span class="field-top"><span>Limiar do osso (3D e cobertura)</span><span class="val" id="v-thr"></span></span><input type="range" id="r-thr" min="0" max="3000" step="10"></label>
+          <label class="field" for="r-op"><span class="field-top"><span>Opacidade do osso no 3D</span><span class="val" id="v-op"></span></span><input type="range" id="r-op" min="0.15" max="1" step="0.05"></label>
+          <div class="row"><button class="btn small" id="btn-3d" type="button">Atualizar 3D</button><span class="legend"><span><i style="background:var(--accent)"></i>implante</span><span><i style="background:var(--nerve)"></i>canal</span></span></div>
+        </div>
+      </section>
+
+      <section>
         <div class="row" style="justify-content:space-between;align-items:baseline"><h2>Implantes</h2><button class="btn small primary" id="btn-report" type="button">Gerar relatório</button></div>
         <div class="imp-list" id="imp-list"></div>
         <div id="imp-editor"></div>
@@ -201,22 +218,6 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
         <p class="empty" id="nerve-info" style="margin:8px 0 0"></p>
       </section>
 
-      <section>
-        <h2>Imagem</h2>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <div class="row">
-            <button class="btn small" data-wl="bone" type="button">Osso</button>
-            <button class="btn small" data-wl="soft" type="button">Tecido mole</button>
-            <button class="btn small" data-wl="auto" type="button">Auto</button>
-            <span class="pane-info" id="wl-read" style="margin-left:auto"></span>
-          </div>
-          <label class="field" for="r-slab"><span class="field-top"><span>Espessura da panorâmica</span><span class="val" id="v-slab"></span></span><input type="range" id="r-slab" min="0" max="20" step="1"></label>
-          <label class="field" for="r-off"><span class="field-top"><span>Deslocar panorâmica (V/L)</span><span class="val" id="v-off"></span></span><input type="range" id="r-off" min="-10" max="10" step="0.5"></label>
-          <label class="field" for="r-thr"><span class="field-top"><span>Limiar do osso (3D e cobertura)</span><span class="val" id="v-thr"></span></span><input type="range" id="r-thr" min="0" max="3000" step="10"></label>
-          <label class="field" for="r-op"><span class="field-top"><span>Opacidade do osso no 3D</span><span class="val" id="v-op"></span></span><input type="range" id="r-op" min="0.15" max="1" step="0.05"></label>
-          <div class="row"><button class="btn small" id="btn-3d" type="button">Atualizar 3D</button><span class="legend"><span><i style="background:var(--accent)"></i>implante</span><span><i style="background:var(--nerve)"></i>canal</span></span></div>
-        </div>
-      </section>
 
       <p class="note">Biblioteca de implantes: linha GM, superfícies Acqua e NeoPoros, Ø 3,5 a 7,0 mm. Parafuso de cobertura: use a chave Neo digital (104.060) e não exceda 10 N.cm na inserção.<br><br>Ferramenta de ensino e simulação. Os arquivos ficam só neste computador e nada é enviado. Não substitui o software de planejamento nem gera guia cirúrgica. As distâncias dependem da calibração do exame e da marcação do canal.</p>
     </aside>
@@ -270,7 +271,7 @@ function segSegDist(p1,q1,p2,q2){
 
 /* ---------------- State ---------------- */
 const st = {
-  vol:null, wl:{w:2600,l:700}, cur:[0,0,0], mode:'plan', tool:'nav',
+  vol:null, wl:{w:2600,l:700}, gamma:1.2, cur:[0,0,0], mode:'plan', tool:'nav',
   curve:{pts:[], S:null, len:0, z:0, drawing:false}, crossIdx:0, panoSlab:8, panoOff:0, crossW:32,
   implants:[], sel:null, nerves:[], activeNerve:-1, nerveR:1.2, boneThr:400, boneOpacity:0.6,
   measures:[], idSeq:1, isDemo:false
@@ -506,7 +507,8 @@ function renderImage(p){
   if(!g){ p.img=null; return; }
   const {w,h}=g; if(p.off.width!==w||p.off.height!==h){ p.off.width=w; p.off.height=h; p.img=null; }
   if(!p.img) p.img=p.off.getContext('2d').createImageData(w,h);
-  const D=p.img.data, W=st.wl.w, lo=st.wl.l-W/2, sc=255/W, q=st.vol.p;
+  const D=p.img.data, W=st.wl.w, lo=st.wl.l-W/2, sc=1023/W, q=st.vol.p;
+  const LUT=new Uint8Array(1024); for(let i=0;i<1024;i++) LUT[i]=Math.round(255*Math.pow(i/1023, st.gamma));
   const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); return {a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:im.cover,sel:im.id===st.sel,bad:ev.status==='bad'};});
   const segs=[]; st.nerves.forEach(pl=>{ for(let i=0;i<pl.length-1;i++) segs.push([pl[i],pl[i+1]]); });
   const NR=st.nerveR, hasOv=imps.length||segs.length, edge=q*1.1;
@@ -521,7 +523,7 @@ function renderImage(p){
       if(g.planar){ x=g.O[0]+u*g.DU[0]+v*g.DV[0]; y=g.O[1]+u*g.DU[1]+v*g.DV[1]; z=g.O[2]+u*g.DU[2]+v*g.DV[2]; val=S(x,y,z); }
       else { const c=Sx[u]; x=c.x+c.nx*st.panoOff; y=c.y+c.ny*st.panoOff; z=VZ-v*q;
         if(slabN){ let acc=0, n=0; for(let s=-slabN;s<=slabN;s++){ acc+=S(x+c.nx*s*slabStep, y+c.ny*s*slabStep, z); n++; } val=acc/n; } else val=S(x,y,z); }
-      let gv=(val-lo)*sc; gv=gv<0?0:(gv>255?255:gv);
+      let gi=(val-lo)*sc; gi=gi<0?0:(gi>1023?1023:gi|0); const gv=LUT[gi];
       let R=gv,G=gv,B=gv;
       if(hasOv){
         for(let n=0;n<segs.length;n++){ const A=segs[n][0], Bp=segs[n][1];
@@ -561,7 +563,7 @@ function drawPane(p){
   if(p.dirty){ renderImage(p); p.dirty=false; }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,r.width,r.height);
   const g=p.geo;
-  if(!st.vol){ showMsg(p,'Abra uma tomografia ou carregue o exemplo.'); p.info.textContent=''; return; }
+  if(!st.vol){ showMsg(p, p.slot===0 ? 'Clique em Abrir tomografia e escolha a pasta DICOM do exame.' : ''); p.info.textContent=''; return; }
   if(!g){ showMsg(p, p.kind==='pano'||p.kind==='cross' ? 'Desenhe a curva da arcada no corte axial com a ferramenta Curva (clique ponto a ponto, duplo clique para terminar).' : ''); p.info.textContent=''; return; }
   showMsg(p,null);
   const X=fitXform(p); p.X=X;
@@ -758,6 +760,10 @@ function renderSide(){
   const v=st.vol;
   $('#exam-kv').innerHTML = v ? `<dt>Exame</dt><dd title="${esc(v.name)}">${esc(v.name)}</dd><dt>Matriz</dt><dd>${v.nx} × ${v.ny} × ${v.nz}</dd><dt>Voxel</dt><dd>${fmt(v.sx,2)} × ${fmt(v.sy,2)} × ${fmt(v.sz,2)} mm</dd><dt>Volume</dt><dd>${fmt(v.X,0)} × ${fmt(v.Y,0)} × ${fmt(v.Z,0)} mm</dd>` : `<dt>Exame</dt><dd>nenhum</dd>`;
   $('#wl-read').textContent = `J ${Math.round(st.wl.w)} · N ${Math.round(st.wl.l)}`;
+  { const R=wlRange(); const tb=clamp((R.lmax-st.wl.l)/(R.lmax-R.lmin),0,1), tc=clamp((R.wmax-st.wl.w)/(R.wmax-R.wmin),0,1);
+    if(document.activeElement!==$('#r-bri')) $('#r-bri').value=Math.round(tb*1000); if(document.activeElement!==$('#r-con')) $('#r-con').value=Math.round(tc*1000);
+    $('#v-bri').textContent=Math.round(tb*100)+'%'; $('#v-con').textContent=Math.round(tc*100)+'%';
+    $('#r-gam').value=st.gamma; $('#v-gam').textContent=st.gamma.toFixed(2).replace('.',','); }
   $('#v-slab').textContent=st.panoSlab+' mm'; $('#r-slab').value=st.panoSlab;
   $('#v-off').textContent=fmt(st.panoOff)+' mm'; $('#r-off').value=st.panoOff;
   $('#v-thr').textContent=st.boneThr; $('#r-thr').value=st.boneThr;
@@ -817,10 +823,18 @@ $('#r-op').addEventListener('input',e=>{st.boneOpacity=+e.target.value; $('#v-op
 $('#btn-3d').addEventListener('click',()=>build3D());
 $('#btn-nerve-new').addEventListener('click',()=>{ setTool('nerve'); st.activeNerve=-1; flash('Clique no centro do canal na panorâmica, ponto a ponto. Duplo clique termina.'); });
 $('#btn-nerve-clear').addEventListener('click',()=>{ st.nerves=[]; st.activeNerve=-1; invalidate(); });
-$$('[data-wl]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.wl; if(k==='auto') autoWL(); else if(k==='bone'){ st.wl= st.vol&&st.vol.isDemo?{w:2600,l:700}:{w:Math.max(800,(st.vol?.hi-st.vol?.lo)||3000),l:(st.vol?((st.vol.hi+st.vol.lo)/2+(st.vol.hi-st.vol.lo)*0.1):700)}; } else st.wl={w:400,l:40}; invalidate({three:false}); }));
-function autoWL(){ const v=st.vol; if(!v) return; st.wl={w:Math.max(50,v.hi-v.lo), l:(v.hi+v.lo)/2}; }
+$$('[data-wl]').forEach(b=>b.addEventListener('click',()=>{ const v=st.vol; if(!v) return; const k=b.dataset.wl;
+  if(k==='auto') autoWL();
+  else if(k==='bone'){ const lo=v.p90, hi=v.vmax; st.wl={w:Math.max(50,hi-lo), l:(hi+lo)/2}; st.gamma=1.0; }
+  else { st.wl={w:st.wl.w*0.85, l:st.wl.l+st.wl.w*0.12}; st.gamma=Math.min(2.5,st.gamma+0.2); }
+  invalidate({three:false}); }));
+function wlRange(){ const v=st.vol; const span=Math.max(100,(v?v.vmax-v.vmin:4000)); return {lmin:v?v.vmin:-1000, lmax:v?v.vmax:3000, wmin:Math.max(20,span*0.03), wmax:span*1.6}; }
+$('#r-bri').addEventListener('input',e=>{ const R=wlRange(), t=+e.target.value/1000; st.wl.l = R.lmax - t*(R.lmax-R.lmin); invalidate({three:false}); });
+$('#r-con').addEventListener('input',e=>{ const R=wlRange(), t=+e.target.value/1000; st.wl.w = R.wmax - t*(R.wmax-R.wmin); invalidate({three:false}); });
+$('#r-gam').addEventListener('input',e=>{ st.gamma=+e.target.value; invalidate({three:false}); });
+function autoWL(){ const v=st.vol; if(!v) return; const lo=v.p40, hi=v.hi; st.wl={w:Math.max(50,hi-lo), l:(hi+lo)/2}; st.gamma=1.2; }
 function volStats(v){ const d=v.data, n=d.length, step=Math.max(1,Math.floor(n/400000)); const arr=[]; for(let i=0;i<n;i+=step) arr.push(d[i]); arr.sort((a,b)=>a-b);
-  const pct=f=>arr[Math.min(arr.length-1,Math.floor(arr.length*f))]; v.lo=pct(0.02); v.hi=pct(0.998); v.p90=pct(0.9); v.p97=pct(0.97); }
+  const pct=f=>arr[Math.min(arr.length-1,Math.floor(arr.length*f))]; v.lo=pct(0.02); v.hi=pct(0.998); v.p90=pct(0.9); v.p97=pct(0.97); v.p40=pct(0.4); v.vmin=pct(0.001); v.vmax=pct(0.9995); }
 
 /* ---------------- 3D ---------------- */
 let R3=null;
@@ -977,7 +991,6 @@ async function loadFiles(files){
   if(R3) R3.placed=false; build3D(); invalidate();
 }
 $('#file-dir').addEventListener('change',e=>{ loadFiles(Array.from(e.target.files)); e.target.value=''; });
-$('#file-files').addEventListener('change',e=>{ loadFiles(Array.from(e.target.files)); e.target.value=''; });
 // drag & drop of folders
 let dragDepth=0;
 window.addEventListener('dragenter',e=>{ if(e.dataTransfer&&Array.from(e.dataTransfer.types).includes('Files')){ dragDepth++; $('#drop').hidden=false; e.preventDefault(); } });
@@ -1005,7 +1018,6 @@ function loadDemo(){
     flash('Exemplo didático: implante 1 dentro da margem mas abaixo de 3 mm do canal, implante 2 invadindo o canal.');
   },30);
 }
-$('#btn-demo').addEventListener('click',loadDemo);
 
 
 /* ---------------- Report ---------------- */
@@ -1146,8 +1158,8 @@ $('#rep-pdf').addEventListener('click',async()=>{
 /* ---------------- Boot ---------------- */
 const ro=new ResizeObserver(()=>{ size3D(); render3D(); invalidate({img:false,side:false,three:false}); });
 panes.forEach(p=>ro.observe(p.cv)); ro.observe(c3d);
-assignKinds(); $('#hint').innerHTML=HINTS.nav;
-loadDemo();
+assignKinds(); $('#hint').innerHTML='<b>Abrir tomografia</b> e escolha a pasta DICOM do exame, ou arraste a pasta para esta janela.';
+invalidate();
 })();
 </script>
 
