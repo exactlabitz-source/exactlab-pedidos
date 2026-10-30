@@ -189,6 +189,10 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
           <label class="field" for="r-bri"><span class="field-top"><span>Brilho</span><span class="val" id="v-bri"></span></span><input type="range" id="r-bri" min="0" max="1000" step="1"></label>
           <label class="field" for="r-con"><span class="field-top"><span>Contraste</span><span class="val" id="v-con"></span></span><input type="range" id="r-con" min="0" max="1000" step="1"></label>
           <label class="field" for="r-gam"><span class="field-top"><span>Tons de cinza (gama)</span><span class="val" id="v-gam"></span></span><input type="range" id="r-gam" min="0.5" max="2.5" step="0.05"></label>
+          <div class="field"><span>Filtro de imagem</span>
+            <div class="seg" role="group" aria-label="Filtro de imagem" style="align-self:flex-start"><button type="button" id="flt-none">Original</button><button type="button" id="flt-hd">HD</button></div>
+          </div>
+          <label class="field" for="r-fk" id="fk-wrap"><span class="field-top"><span>Intensidade do HD</span><span class="val" id="v-fk"></span></span><input type="range" id="r-fk" min="0.2" max="1.5" step="0.05"></label>
           <div class="row">
             <button class="btn small" data-wl="auto" type="button">Automático</button>
             <button class="btn small" data-wl="bone" type="button">Osso</button>
@@ -271,7 +275,7 @@ function segSegDist(p1,q1,p2,q2){
 
 /* ---------------- State ---------------- */
 const st = {
-  vol:null, wl:{w:2600,l:700}, gamma:1.2, cur:[0,0,0], mode:'plan', tool:'nav',
+  vol:null, wl:{w:2600,l:700}, gamma:1.2, filter:'realce', filterK:0.6, cur:[0,0,0], mode:'plan', tool:'nav',
   curve:{pts:[], S:null, len:0, z:0, drawing:false}, crossIdx:0, panoSlab:8, panoOff:0, crossW:32,
   implants:[], sel:null, nerves:[], activeNerve:-1, nerveR:1.2, boneThr:400, boneOpacity:0.6,
   measures:[], idSeq:1, isDemo:false
@@ -296,10 +300,17 @@ function impRadius(im,t){ const R=im.d/2; let r = t<0.45 ? R*(0.6+0.4*t/0.45) : 
 /* ---------------- Volume sampling ---------------- */
 function sampler(vol){
   const {nx,ny,nz,data}=vol, isx=1/vol.sx, isy=1/vol.sy, isz=1/vol.sz, nxy=nx*ny;
+  const mx=nx-1, my=ny-1, mz=nz-1;
   return function(x,y,z){
-    const i=Math.floor(x*isx+0.5), j=Math.floor(y*isy+0.5), k=Math.floor(z*isz+0.5);
-    if(i<0||j<0||k<0||i>=nx||j>=ny||k>=nz) return AIR;
-    return data[k*nxy+j*nx+i];
+    const fx=x*isx, fy=y*isy, fz=z*isz;
+    if(fx<-0.5||fy<-0.5||fz<-0.5||fx>mx+0.5||fy>my+0.5||fz>mz+0.5) return AIR;
+    const cx=fx<0?0:(fx>mx?mx:fx), cy=fy<0?0:(fy>my?my:fy), cz=fz<0?0:(fz>mz?mz:fz);
+    const i=cx|0, j=cy|0, k=cz|0, i1=i<mx?i+1:i, j1=j<my?j+1:j, k1=k<mz?k+1:k, dx=cx-i, dy=cy-j, dz=cz-k;
+    const b=k*nxy, b1=k1*nxy, r=j*nx, r1=j1*nx;
+    const c00=data[b+r+i]+(data[b+r+i1]-data[b+r+i])*dx, c10=data[b+r1+i]+(data[b+r1+i1]-data[b+r1+i])*dx;
+    const c01=data[b1+r+i]+(data[b1+r+i1]-data[b1+r+i])*dx, c11=data[b1+r1+i]+(data[b1+r1+i1]-data[b1+r1+i])*dx;
+    const c0=c00+(c10-c00)*dy, c1=c01+(c11-c01)*dy;
+    return c0+(c1-c0)*dz;
   };
 }
 let S = ()=>AIR;
@@ -307,7 +318,7 @@ let S = ()=>AIR;
 function setVolume(vol){
   vol.X=(vol.nx-1)*vol.sx; vol.Y=(vol.ny-1)*vol.sy; vol.Z=(vol.nz-1)*vol.sz;
   const minS=Math.min(vol.sx,vol.sy,vol.sz);
-  vol.p=Math.max(minS, Math.max(vol.X,vol.Y,vol.Z)/720);
+  vol.p=Math.max(minS, Math.max(vol.X,vol.Y,vol.Z)/900);
   st.vol=vol; S=sampler(vol);
   st.cur=[vol.X/2, vol.Y/2, vol.Z/2];
   st.curve={pts:[],S:null,len:0,z:vol.Z/2,drawing:false};
@@ -501,36 +512,65 @@ function evaluate(im){
 
 /* ---------------- 2D rendering ---------------- */
 const COL={imp:[236,75,142], impSel:[255,140,190], bad:[255,90,95], nerve:[242,193,78]};
+function applyFilter(G,T,w,h,mode,k){
+  if(mode==='none'||k<=0) return;
+  const n=w*h, v=st.vol, span=Math.max(200,(v.vmax-v.vmin)||2000);
+  const blur3=(src,dst)=>{ for(let y=0;y<h;y++){ const y0=y>0?y-1:y, y1=y<h-1?y+1:y; for(let x=0;x<w;x++){ const x0=x>0?x-1:x, x1=x<w-1?x+1:x;
+      dst[y*w+x]=(4*src[y*w+x]+2*(src[y*w+x0]+src[y*w+x1]+src[y0*w+x]+src[y1*w+x])+src[y0*w+x0]+src[y0*w+x1]+src[y1*w+x0]+src[y1*w+x1])/16; } } };
+  if(mode==='suave'||mode==='realce'){
+    const sig=span*(0.02+0.05*Math.min(1.5,k)), inv=1/(2*sig*sig), LN=512, st_=sig*3/LN, LUTw=new Float32Array(LN+1);
+    for(let i=0;i<=LN;i++){ const d=i*st_; LUTw[i]=Math.exp(-d*d*inv); }
+    const sw=[0.6,1,0.6,1,1.6,1,0.6,1,0.6];
+    for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const c=G[y*w+x]; let acc=0, ws=0, q=0;
+        for(let yy=-1;yy<=1;yy++){ const Y=y+yy<0?0:(y+yy>=h?h-1:y+yy); for(let xx=-1;xx<=1;xx++,q++){ const X=x+xx<0?0:(x+xx>=w?w-1:x+xx); const val=G[Y*w+X];
+          let di=Math.abs(val-c)/st_; const wr=di>=LN?0:LUTw[di|0]; const ww=wr*sw[q]; acc+=val*ww; ws+=ww; } }
+        T[y*w+x]=acc/ws; } }
+    G.set(T);
+    if(k>0.4){ for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const c=G[y*w+x]; let acc=0, ws=0, q=0;
+        for(let yy=-1;yy<=1;yy++){ const Y=y+yy<0?0:(y+yy>=h?h-1:y+yy); for(let xx=-1;xx<=1;xx++,q++){ const X=x+xx<0?0:(x+xx>=w?w-1:x+xx); const val=G[Y*w+X];
+          let di=Math.abs(val-c)/st_; const wr=di>=LN?0:LUTw[di|0]; const ww=wr*sw[q]; acc+=val*ww; ws+=ww; } }
+        T[y*w+x]=acc/ws; } } G.set(T); }
+  }
+  if(mode==='nitido'||mode==='realce'){
+    const amt=(mode==='nitido'?1.2:0.9)*k; const T2=new Float32Array(n); blur3(G,T); blur3(T,T2);
+    const thrN=span*0.035; // não realça o ruído fino
+    for(let i=0;i<n;i++){ const d=G[i]-T2[i], ad=Math.abs(d); const g2=ad<thrN?(ad/thrN)*(ad/thrN):1; G[i]=G[i]+amt*d*g2; }
+  }
+}
 function renderImage(p){
   const g=p.geo=paneGeo(p);
-  if(!st.vol){ p.img=null; return; }
-  if(!g){ p.img=null; return; }
+  if(!st.vol||!g){ p.img=null; return; }
   const {w,h}=g; if(p.off.width!==w||p.off.height!==h){ p.off.width=w; p.off.height=h; p.img=null; }
   if(!p.img) p.img=p.off.getContext('2d').createImageData(w,h);
-  const D=p.img.data, W=st.wl.w, lo=st.wl.l-W/2, sc=1023/W, q=st.vol.p;
+  const n=w*h; if(!p.buf||p.buf.length!==n){ p.buf=new Float32Array(n); p.tmp=new Float32Array(n); }
+  const Gb=p.buf, D=p.img.data, q=st.vol.p, VZ=st.vol.Z, Sx=st.curve.S;
+  let slabN=0, slabStep=0;
+  if(!g.planar && st.panoSlab>0){ slabN=Math.min(8, Math.max(1, Math.round(st.panoSlab/2/q))); slabStep=st.panoSlab/2/slabN; }
+  let o=0;
+  for(let v=0;v<h;v++){ for(let u=0;u<w;u++,o++){
+      if(g.planar){ Gb[o]=S(g.O[0]+u*g.DU[0]+v*g.DV[0], g.O[1]+u*g.DU[1]+v*g.DV[1], g.O[2]+u*g.DU[2]+v*g.DV[2]); }
+      else { const c=Sx[u], x=c.x+c.nx*st.panoOff, y=c.y+c.ny*st.panoOff, z=VZ-v*q;
+        if(slabN){ let acc=0; for(let s=-slabN;s<=slabN;s++) acc+=S(x+c.nx*s*slabStep, y+c.ny*s*slabStep, z); Gb[o]=acc/(2*slabN+1); } else Gb[o]=S(x,y,z); } } }
+  applyFilter(Gb, p.tmp, w, h, st.filter, st.filterK);
+  const W=st.wl.w, lo=st.wl.l-W/2, sc=1023/W;
   const LUT=new Uint8Array(1024); for(let i=0;i<1024;i++) LUT[i]=Math.round(255*Math.pow(i/1023, st.gamma));
   const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); return {a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:im.cover,sel:im.id===st.sel,bad:ev.status==='bad'};});
   const segs=[]; st.nerves.forEach(pl=>{ for(let i=0;i<pl.length-1;i++) segs.push([pl[i],pl[i+1]]); });
   const NR=st.nerveR, hasOv=imps.length||segs.length, edge=q*1.1;
-  const VZ=st.vol.Z;
-  let slabN=0, slabStep=0;
-  if(!g.planar && st.panoSlab>0){ slabN=Math.min(12, Math.max(1, Math.round(st.panoSlab/2/q))); slabStep=st.panoSlab/2/slabN; }
-  const Sx=st.curve.S;
-  let o=0;
+  o=0;
   for(let v=0;v<h;v++){
-    for(let u=0;u<w;u++,o+=4){
-      let x,y,z,val;
-      if(g.planar){ x=g.O[0]+u*g.DU[0]+v*g.DV[0]; y=g.O[1]+u*g.DU[1]+v*g.DV[1]; z=g.O[2]+u*g.DU[2]+v*g.DV[2]; val=S(x,y,z); }
-      else { const c=Sx[u]; x=c.x+c.nx*st.panoOff; y=c.y+c.ny*st.panoOff; z=VZ-v*q;
-        if(slabN){ let acc=0, n=0; for(let s=-slabN;s<=slabN;s++){ acc+=S(x+c.nx*s*slabStep, y+c.ny*s*slabStep, z); n++; } val=acc/n; } else val=S(x,y,z); }
-      let gi=(val-lo)*sc; gi=gi<0?0:(gi>1023?1023:gi|0); const gv=LUT[gi];
+    for(let u=0;u<w;u++,o++){
+      let gi=(Gb[o]-lo)*sc; gi=gi<0?0:(gi>1023?1023:gi|0); const gv=LUT[gi];
       let R=gv,G=gv,B=gv;
       if(hasOv){
-        for(let n=0;n<segs.length;n++){ const A=segs[n][0], Bp=segs[n][1];
+        let x,y,z;
+        if(g.planar){ x=g.O[0]+u*g.DU[0]+v*g.DV[0]; y=g.O[1]+u*g.DU[1]+v*g.DV[1]; z=g.O[2]+u*g.DU[2]+v*g.DV[2]; }
+        else { const c=Sx[u]; x=c.x+c.nx*st.panoOff; y=c.y+c.ny*st.panoOff; z=VZ-v*q; }
+        for(let n2=0;n2<segs.length;n2++){ const A=segs[n2][0], Bp=segs[n2][1];
           const dx=Bp[0]-A[0], dy=Bp[1]-A[1], dz=Bp[2]-A[2], l2=dx*dx+dy*dy+dz*dz; let t=l2?((x-A[0])*dx+(y-A[1])*dy+(z-A[2])*dz)/l2:0; t=t<0?0:(t>1?1:t);
           const ex=A[0]+dx*t-x, ey=A[1]+dy*t-y, ez=A[2]+dz*t-z, d=Math.sqrt(ex*ex+ey*ey+ez*ez);
           if(d<NR){ const al=d>NR-edge?0.95:0.38; R=R*(1-al)+COL.nerve[0]*al; G=G*(1-al)+COL.nerve[1]*al; B=B*(1-al)+COL.nerve[2]*al; break; } }
-        for(let n=0;n<imps.length;n++){ const I=imps[n], A=I.a, Bp=I.h;
+        for(let n2=0;n2<imps.length;n2++){ const I=imps[n2], A=I.a, Bp=I.h;
           const dx=Bp[0]-A[0], dy=Bp[1]-A[1], dz=Bp[2]-A[2], l2=dx*dx+dy*dy+dz*dz; const t=l2?((x-A[0])*dx+(y-A[1])*dy+(z-A[2])*dz)/l2:0;
           const len=I.L, sAx=t*len; if(t<0||sAx>len+I.cv) continue;
           const ex=A[0]+dx*t-x, ey=A[1]+dy*t-y, ez=A[2]+dz*t-z, d=Math.sqrt(ex*ex+ey*ey+ez*ez);
@@ -541,12 +581,11 @@ function renderImage(p){
             if(fill){ const cc=I.bad?COL.bad:(I.sel?COL.impSel:COL.imp); const capE=Math.min(sAx,len-sAx);
               const al=(d>ro-edge||capE<edge)?1:(thr?0.75:(I.sel?0.42:0.3)); R=R*(1-al)+cc[0]*al; G=G*(1-al)+cc[1]*al; B=B*(1-al)+cc[2]*al; break; } } }
       }
-      D[o]=R; D[o+1]=G; D[o+2]=B; D[o+3]=255;
+      const oo=o*4; D[oo]=R; D[oo+1]=G; D[oo+2]=B; D[oo+3]=255;
     }
   }
   p.off.getContext('2d').putImageData(p.img,0,0);
 }
-
 function fitXform(p){
   const r=p.cv.getBoundingClientRect(), cw=r.width, ch=r.height, g=p.geo;
   if(!g) return {s:1,ox:0,oy:0,cw,ch};
@@ -760,14 +799,17 @@ function renderSide(){
   const v=st.vol;
   $('#exam-kv').innerHTML = v ? `<dt>Exame</dt><dd title="${esc(v.name)}">${esc(v.name)}</dd><dt>Matriz</dt><dd>${v.nx} × ${v.ny} × ${v.nz}</dd><dt>Voxel</dt><dd>${fmt(v.sx,2)} × ${fmt(v.sy,2)} × ${fmt(v.sz,2)} mm</dd><dt>Volume</dt><dd>${fmt(v.X,0)} × ${fmt(v.Y,0)} × ${fmt(v.Z,0)} mm</dd>` : `<dt>Exame</dt><dd>nenhum</dd>`;
   $('#wl-read').textContent = `J ${Math.round(st.wl.w)} · N ${Math.round(st.wl.l)}`;
+  $('#flt-none').classList.toggle('on',st.filter==='none'); $('#flt-hd').classList.toggle('on',st.filter!=='none');
+  $('#fk-wrap').hidden=st.filter==='none'; $('#r-fk').value=st.filterK; $('#v-fk').textContent=Math.round(st.filterK*100)+'%';
+  $('#v-slab').textContent=st.panoSlab+' mm'; $('#r-slab').value=st.panoSlab;
+  $('#v-off').textContent=fmt(st.panoOff)+' mm'; $('#r-off').value=st.panoOff;
+  if(st.vol){ const t=$('#r-thr'); t.min=Math.floor(st.vol.vmin/10)*10; t.max=Math.ceil(st.vol.vmax/10)*10; }
+  $('#v-thr').textContent=st.boneThr; $('#r-thr').value=st.boneThr;
+  $('#v-op').textContent=Math.round(st.boneOpacity*100)+'%'; $('#r-op').value=st.boneOpacity;
   { const R=wlRange(); const tb=clamp((R.lmax-st.wl.l)/(R.lmax-R.lmin),0,1), tc=clamp((R.wmax-st.wl.w)/(R.wmax-R.wmin),0,1);
     if(document.activeElement!==$('#r-bri')) $('#r-bri').value=Math.round(tb*1000); if(document.activeElement!==$('#r-con')) $('#r-con').value=Math.round(tc*1000);
     $('#v-bri').textContent=Math.round(tb*100)+'%'; $('#v-con').textContent=Math.round(tc*100)+'%';
     $('#r-gam').value=st.gamma; $('#v-gam').textContent=st.gamma.toFixed(2).replace('.',','); }
-  $('#v-slab').textContent=st.panoSlab+' mm'; $('#r-slab').value=st.panoSlab;
-  $('#v-off').textContent=fmt(st.panoOff)+' mm'; $('#r-off').value=st.panoOff;
-  $('#v-thr').textContent=st.boneThr; $('#r-thr').value=st.boneThr;
-  $('#v-op').textContent=Math.round(st.boneOpacity*100)+'%'; $('#r-op').value=st.boneOpacity;
   const list=$('#imp-list');
   if(!st.implants.length){ list.innerHTML=`<p class="empty">Nenhum implante. Use a ferramenta <b>Implante</b> e clique na crista, na transversal ou na panorâmica.</p>`; }
   else list.innerHTML = st.implants.map((im,i)=>{ const ev=evaluate(im); return `<button type="button" class="imp ${im.id===st.sel?'sel':''}" data-imp="${im.id}"><span class="imp-n">${i+1}</span><span class="imp-t">Ø ${dTxt(im.d)} × ${lTxt(im.L)} mm<small>${im.region?'região '+esc(im.region)+' · ':''}${impCode(im)} · ${im.surf}</small></span>${chip(ev.status,LABEL[ev.status])}</button>`; }).join('');
@@ -815,6 +857,9 @@ function lTxt(l){ return l%1?String(l).replace('.',','):l+',0'; }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function focusImplant(im){ if(!im) return; if(st.curve.S){ st.crossIdx=nearestCurveIdx(im.c[0],im.c[1]); } st.cur=[im.c[0],im.c[1],im.c[2]]; invalidate(); }
 
+$('#flt-none').addEventListener('click',()=>{ st.filter='none'; invalidate({three:false}); });
+$('#flt-hd').addEventListener('click',()=>{ st.filter='realce'; invalidate({three:false}); });
+$('#r-fk').addEventListener('input',e=>{ st.filterK=+e.target.value; $('#v-fk').textContent=Math.round(st.filterK*100)+'%'; invalidate({three:false}); });
 $('#r-slab').addEventListener('input',e=>{st.panoSlab=+e.target.value; invalidate({three:false});});
 $('#r-off').addEventListener('input',e=>{st.panoOff=+e.target.value; invalidate({three:false});});
 $('#r-thr').addEventListener('input',e=>{st.boneThr=+e.target.value; need.side=true; $('#v-thr').textContent=st.boneThr; invalidate({three:false}); mark3dStale();});
