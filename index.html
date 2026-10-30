@@ -473,8 +473,9 @@ function planeNormal(p, P){
 
 /* ---------------- Implants ---------------- */
 function impEnds(im){ return {head:add(im.c,mul(im.a,im.L/2)), apex:sub(im.c,mul(im.a,im.L/2))}; }
-function newImplant(head, d=4.0, L=10){
-  const a=[0,0,1]; const im={id:st.idSeq++, d, L, a, c:sub(head,mul(a,L/2)), surf:'Acqua', cover:0, region:''};
+function boneDirAt(P){ let up=0, dn=0; for(let k=1;k<=12;k++){ up+=S(P[0],P[1],P[2]+k); dn+=S(P[0],P[1],P[2]-k); } return dn>=up ? 1 : -1; }
+function newImplant(head, d=4.0, L=10, dir){
+  const a=[0,0,dir!=null?dir:(st.vol?boneDirAt(head):1)]; const im={id:st.idSeq++, d, L, a, c:sub(head,mul(a,L/2)), surf:'Acqua', cover:0, region:''};
   st.implants.push(im); st.sel=im.id; return im;
 }
 function selImp(){ return st.implants.find(i=>i.id===st.sel)||null; }
@@ -605,7 +606,10 @@ function drawPane(p){
   if(!st.vol){ showMsg(p, p.slot===0 ? 'Clique em Abrir tomografia e escolha a pasta DICOM do exame.' : ''); p.info.textContent=''; return; }
   if(!g){ showMsg(p, p.kind==='pano'||p.kind==='cross' ? 'Desenhe a curva da arcada no corte axial com a ferramenta Curva (clique ponto a ponto, duplo clique para terminar).' : ''); p.info.textContent=''; return; }
   showMsg(p,null);
-  const X=fitXform(p); p.X=X;
+  let X=fitXform(p);
+  if(p.needCenter){ p.needCenter=false; const im=st.implants.find(i=>i.id===st.centerId);
+    if(im&&p.zoom>1.05){ const t=toImg(p,im.c); if(t){ const c=imgToCv(X,t[0],t[1]); p.panX+=X.cw/2-c[0]; p.panY+=X.ch/2-c[1]; X=fitXform(p); } } }
+  p.X=X;
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   ctx.drawImage(p.off, X.ox, X.oy, g.w*X.s, g.h*X.s);
   drawOverlays(p, ctx, X);
@@ -658,7 +662,7 @@ function drawOverlays(p, ctx, X){
     if(!near) return;
     const sel=im.id===st.sel;
     line(A.c,H.c, sel?'#FFFFFF':'rgba(255,255,255,.55)', sel?1.5:1, [5,4]);
-    if(sel && p.kind!=='axial'){ dotAt(H.c,6,'#EC4B8E','#FFFFFF'); }
+    if(sel && p.kind!=='axial'){ dotAt(A.c,7,'#EC4B8E','#FFFFFF'); dotAt(H.c,3,'#FFFFFF'); }
     ctx.fillStyle='#FFFFFF'; ctx.font='700 12px Rubik, Arial'; ctx.fillText(String(idx+1), H.c[0]+8, H.c[1]-6);
   });
   // measures
@@ -688,7 +692,7 @@ const HINTS={
   nav:'<b>Clique</b> posiciona os cortes · <b>arraste</b> move a imagem · <b>roda</b> troca o corte · <b>Ctrl+roda</b> zoom · <b>botão direito</b> brilho/contraste',
   curve:'No <b>axial</b>, clique ao longo do centro da arcada, da direita para a esquerda · <b>duplo clique</b> termina · nova curva apaga a anterior',
   nerve:'Na <b>panorâmica</b> ou na <b>transversal</b>, clique no centro do canal ponto a ponto · <b>duplo clique</b> ou Esc termina este canal',
-  implant:'Na <b>transversal</b> ou <b>panorâmica</b>, clique na crista: o implante nasce com a plataforma nesse ponto · arraste o corpo para mover e a bolinha para inclinar',
+  implant:'Na <b>transversal</b> ou <b>panorâmica</b>, clique na crista: a plataforma fica nesse ponto e o ápice vai para o lado do osso (superior ou inferior) · arraste o corpo para mover · arraste a <b>bolinha do ápice</b> para inclinar em qualquer direção · os cortes centralizam no implante',
   ruler:'Arraste em qualquer corte para medir em mm · clique numa medida existente com Shift para apagar'
 };
 function setTool(t){
@@ -708,7 +712,7 @@ function evtPos(p,e){ const r=p.cv.getBoundingClientRect(); return [e.clientX-r.
 function worldAtEvt(p,e){ if(!p.geo||!p.X) return null; const [x,y]=evtPos(p,e); const [u,v]=cvToImg(p.X,x,y); return toWorld(p,u,v); }
 
 function hitImplant(P){ let best=null, bd=Infinity; st.implants.forEach(im=>{ const e=impEnds(im); const d=distPtSeg(P,e.apex,e.head)-im.d/2; if(d<0.6&&d<bd){bd=d;best=im;} }); return best; }
-function hitHandle(p,e){ const im=selImp(); if(!im||p.kind==='axial') return false; const H=toImg(p,impEnds(im).head), C=toImg(p,im.c); if(!H||!C||Math.abs(C[2])>im.d/2+2) return false;
+function hitHandle(p,e){ const im=selImp(); if(!im||p.kind==='axial') return false; const H=toImg(p,impEnds(im).apex), C=toImg(p,im.c); if(!H||!C||Math.abs(C[2])>im.d/2+2) return false;
   const hc=imgToCv(p.X,H[0],H[1]), [x,y]=evtPos(p,e); return Math.hypot(hc[0]-x,hc[1]-y)<10; }
 
 function setPosFrom(p,P){
@@ -757,14 +761,14 @@ panes.forEach(p=>{
     const P=worldAtEvt(p,e); if(!P) return;
     if(drag.type==='measure'){ drag.m.b=P; redraw(p); return; }
     if(drag.type==='move'){ const d=sub(P,drag.last); drag.im.c=add(drag.im.c,d); drag.last=P; invalidate(); return; }
-    if(drag.type==='rot'){ const im=drag.im, n=planeNormal(p,im.c); const t=toImg(p,im.c); const Cp=toWorld(p,t[0],t[1]);
-      const aout=dot(im.a,n); let qd=sub(P,Cp); qd=sub(qd,mul(n,dot(qd,n))); if(vlen(qd)<0.5) return; qd=norm(qd);
-      if(qd[2]<0) qd=mul(qd,-1);
-      im.a=norm(add(mul(qd,Math.sqrt(Math.max(0,1-aout*aout))),mul(n,aout))); invalidate(); return; }
+    if(drag.type==='rot'){ const im=drag.im, H=impEnds(im).head, n=planeNormal(p,H); const t=toImg(p,H); const Hp=toWorld(p,t[0],t[1]);
+      const aout=dot(im.a,n); let qd=sub(P,Hp); qd=sub(qd,mul(n,dot(qd,n))); if(vlen(qd)<0.8) return; qd=norm(qd); // direção da plataforma para o ápice
+      im.a=norm(add(mul(qd,-Math.sqrt(Math.max(0,1-aout*aout))),mul(n,aout))); im.c=sub(H,mul(im.a,im.L/2)); invalidate(); return; }
   });
   const end=e=>{ if(!drag||drag.p!==p) return;
     if(drag.type==='pan'&&!drag.moved&&drag.P){ setPosFrom(p,drag.P); }
     if(drag.type==='measure'&&vlen(sub(drag.m.b,drag.m.a))<0.3){ st.measures.pop(); }
+    if((drag.type==='move'||drag.type==='rot')&&drag.im) centerOn(drag.im);
     drag=null; };
   cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
   cv.addEventListener('dblclick',e=>{ if(st.tool==='curve'&&st.curve.drawing){ st.curve.drawing=false; if(st.curve.pts.length>2) st.curve.pts.pop(); buildCurve(); invalidate(); flash('Curva pronta. Panorâmica e transversal atualizadas.'); }
@@ -839,14 +843,15 @@ function renderSide(){
         <div class="check ${boneS}"><span>Superfície em osso</span><span class="cv">${fmt(ev.bone,0)}%</span><span class="cd">Parte do implante acima do limiar ósseo (${st.boneThr}). Abaixo de 85% sugere exposição de roscas ou fenestração.</span></div>
         <div class="check ${ev.angle>25?'warn':'ok'}"><span>Inclinação</span><span class="cv">${fmt(ev.angle,0)}°</span><span class="cd">Ângulo em relação ao eixo vertical do exame.</span></div>
       </div>
-      <div class="row"><button class="btn small" id="btn-vert" type="button">Endireitar</button><button class="btn small" id="btn-del" type="button">Excluir</button></div>
+      <div class="row"><button class="btn small" id="btn-vert" type="button">Endireitar</button><button class="btn small" id="btn-flip" type="button" title="Gira 180° mantendo a plataforma no lugar">Inverter sentido</button><button class="btn small" id="btn-del" type="button">Excluir</button></div>
     </div>`;
     $('#sel-d').addEventListener('change',e=>{ const head=impEnds(im).head; im.d=+e.target.value; const ls=lensFor(im.d); if(!ls.includes(im.L)){ im.L=ls.reduce((b,l)=>Math.abs(l-im.L)<Math.abs(b-im.L)?l:b, ls[0]); im.c=sub(head,mul(im.a,im.L/2)); } invalidate();});
     $('#sel-s').addEventListener('change',e=>{im.surf=e.target.value; invalidate({three:false});});
     $('#sel-r').addEventListener('change',e=>{im.region=e.target.value.trim(); invalidate({three:false,img:false});});
     $('#sel-c').addEventListener('change',e=>{im.cover=+e.target.value; invalidate();});
     $('#sel-l').addEventListener('change',e=>{ const head=impEnds(im).head; im.L=+e.target.value; im.c=sub(head,mul(im.a,im.L/2)); invalidate();});
-    $('#btn-vert').addEventListener('click',()=>{ const head=impEnds(im).head; im.a=[0,0,1]; im.c=sub(head,mul(im.a,im.L/2)); invalidate(); });
+    $('#btn-vert').addEventListener('click',()=>{ const head=impEnds(im).head; im.a=[0,0,im.a[2]<0?-1:1]; im.c=sub(head,mul(im.a,im.L/2)); centerOn(im); });
+    $('#btn-flip').addEventListener('click',()=>{ const head=impEnds(im).head; im.a=mul(im.a,-1); im.c=sub(head,mul(im.a,im.L/2)); centerOn(im); });
     $('#btn-del').addEventListener('click',()=>{ st.implants=st.implants.filter(x=>x!==im); st.sel=null; invalidate(); });
   }
   const nn=st.nerves.filter(n=>n.length>1).length;
@@ -855,7 +860,9 @@ function renderSide(){
 function dTxt(d){ return String(d).replace('.',','); }
 function lTxt(l){ return l%1?String(l).replace('.',','):l+',0'; }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function focusImplant(im){ if(!im) return; if(st.curve.S){ st.crossIdx=nearestCurveIdx(im.c[0],im.c[1]); } st.cur=[im.c[0],im.c[1],im.c[2]]; invalidate(); }
+function focusImplant(im){ centerOn(im); }
+function centerOn(im){ if(!im||!st.vol) return; if(st.curve.S){ st.crossIdx=nearestCurveIdx(im.c[0],im.c[1]); } st.cur=[clamp(im.c[0],0,st.vol.X),clamp(im.c[1],0,st.vol.Y),clamp(im.c[2],0,st.vol.Z)];
+  st.centerId=im.id; panes.forEach(p=>p.needCenter=true); invalidate(); }
 
 $('#flt-none').addEventListener('click',()=>{ st.filter='none'; invalidate({three:false}); });
 $('#flt-hd').addEventListener('click',()=>{ st.filter='realce'; invalidate({three:false}); });
