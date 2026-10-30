@@ -209,7 +209,7 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
       </section>
 
       <section>
-        <div class="row" style="justify-content:space-between;align-items:baseline"><h2>Implantes</h2><button class="btn small primary" id="btn-report" type="button">Gerar relatório</button></div>
+        <div class="row" style="justify-content:space-between;align-items:baseline"><h2>Implantes</h2><div class="row"><button class="btn small" id="btn-new-imp" type="button">+ Novo implante</button><button class="btn small primary" id="btn-report" type="button">Gerar relatório</button></div></div>
         <div class="imp-list" id="imp-list"></div>
         <div id="imp-editor"></div>
       </section>
@@ -224,7 +224,7 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
       </section>
 
 
-      <p class="note"><b style="color:var(--fg)">Biblioteca de implantes: Neodent Helix GM</b> (somente Helix), superfícies Acqua e NeoPoros, Ø 3,5 a 7,0 mm. Parafuso de cobertura: use a chave Neo digital (104.060) e não exceda 10 N.cm na inserção.<br><br><b style="color:var(--fg)">Ferramenta de ensino e simulação, para referência.</b> Nenhuma medida, distância ou avaliação deste programa é absoluta: todas servem como orientação didática e precisam ser confirmadas pelo profissional no exame original e no software de planejamento. Não substitui o planejamento clínico nem gera guia cirúrgica. Os resultados dependem da qualidade e calibração do exame e da marcação do canal. Os arquivos ficam só neste computador e nada é enviado.</p>
+      <p class="note"><b style="color:var(--fg)">Biblioteca de implantes: Neodent Helix GM</b> (somente Helix), superfícies Acqua e NeoPoros, Ø 3,5 a 7,0 mm. Componentes GM: parafuso de cobertura (0 e 2 mm) e cicatrizador (Ø 3,3 a 6,5 mm, transmucoso 0,8 a 5,5 mm). Use a chave Neo digital (104.060) e não exceda 10 N.cm na inserção.<br><br><b style="color:var(--fg)">Ferramenta de ensino e simulação, para referência.</b> Nenhuma medida, distância ou avaliação deste programa é absoluta: todas servem como orientação didática e precisam ser confirmadas pelo profissional no exame original e no software de planejamento. Não substitui o planejamento clínico nem gera guia cirúrgica. Os resultados dependem da qualidade e calibração do exame e da marcação do canal. Os arquivos ficam só neste computador e nada é enviado.</p>
     </aside>
   </main>
 </div>
@@ -294,7 +294,26 @@ const CAT={
 const DIAMS=[3.5,3.75,4.0,4.3,5.0,6.0,7.0];
 const lensFor=d=>Object.keys(CAT[String(d)]).map(Number).sort((a,b)=>a-b);
 const impCode=im=>{ const c=CAT[String(im.d)]&&CAT[String(im.d)][im.L]; return c ? (im.surf==='NeoPoros'?'109.':'140.')+c : '—'; };
+// Componentes GM: parafuso de cobertura e cicatrizador (código, altura transmucosa)
 const COVER={0:'117.021',2:'117.022'};
+const HEAL={'3.3':{0.8:'207',1.5:'208',2.5:'209',3.5:'210',4.5:'211',5.5:'212'},'4.5':{0.8:'213',1.5:'214',2.5:'215',3.5:'216',4.5:'217',5.5:'218'},
+  '5.5':{1.5:'250',2.5:'251',3.5:'252',4.5:'253'},'6.5':{1.5:'254',2.5:'255',3.5:'256',4.5:'257'}};
+const HEAL_D=[3.3,4.5,5.5,6.5];
+const healH=d=>Object.keys(HEAL[String(d)]).map(Number).sort((a,b)=>a-b);
+const hTxt=h=>String(h).replace('.',',');
+function compCode(im){ const c=im.comp||{type:'none'}; if(c.type==='cover') return COVER[c.h]||''; if(c.type==='heal'){ const k=HEAL[String(c.d)]&&HEAL[String(c.d)][c.h]; return k?'106.'+k:''; } return ''; }
+function compTxt(im){ const c=im.comp||{type:'none'}, code=compCode(im);
+  if(c.type==='cover') return 'Cob. '+hTxt(c.h)+' mm'+(code?' · '+code:'');
+  if(c.type==='heal') return 'Cic. Ø'+hTxt(c.d)+' × '+hTxt(c.h)+(code?' · '+code:'');
+  return '—'; }
+function compParts(im){ const c=im.comp||{type:'none'}, code=compCode(im)||'—';
+  if(c.type==='cover') return ['Cobertura', hTxt(c.h)+' mm', code];
+  if(c.type==='heal') return ['Cicatrizador', 'Ø'+hTxt(c.d)+' × '+hTxt(c.h)+' mm', code];
+  return ['—','—','—']; }
+function compGeo(im){ const c=im.comp||{type:'none'};
+  if(c.type==='cover') return {h:c.h>0?c.h:0.4, rb:Math.min(1.6,im.d/2), rt:Math.min(1.6,im.d/2), col:[214,178,60], hex:0xD6B23C};
+  if(c.type==='heal') return {h:c.h, rb:Math.min(1.75,c.d/2), rt:c.d/2, col:[232,200,96], hex:0xE8C860};
+  return {h:0, rb:0, rt:0, col:[0,0,0], hex:0}; }
 const PITCH=0.9;
 function impRadius(im,t){ const R=im.d/2; let r = t<0.45 ? R*(0.6+0.4*t/0.45) : R; if(t*im.L<0.3) r*=0.85; return r; }
 
@@ -492,7 +511,7 @@ function planeNormal(p, P){
 function impEnds(im){ return {head:add(im.c,mul(im.a,im.L/2)), apex:sub(im.c,mul(im.a,im.L/2))}; }
 function boneDirAt(P){ let up=0, dn=0; for(let k=1;k<=12;k++){ up+=S(P[0],P[1],P[2]+k); dn+=S(P[0],P[1],P[2]-k); } return dn>=up ? 1 : -1; }
 function newImplant(head, d=4.0, L=10, dir){
-  const a=[0,0,dir!=null?dir:(st.vol?boneDirAt(head):1)]; const im={id:st.idSeq++, d, L, a, c:sub(head,mul(a,L/2)), surf:'Acqua', cover:0, region:''};
+  const a=[0,0,dir!=null?dir:(st.vol?boneDirAt(head):1)]; const im={id:st.idSeq++, d, L, a, c:sub(head,mul(a,L/2)), surf:'Acqua', comp:{type:'none'}, region:''};
   st.implants.push(im); st.sel=im.id; return im;
 }
 function selImp(){ return st.implants.find(i=>i.id===st.sel)||null; }
@@ -572,7 +591,7 @@ function renderImage(p){
   applyFilter(Gb, p.tmp, w, h, st.filter, st.filterK);
   const W=st.wl.w, lo=st.wl.l-W/2, sc=1023/W;
   const LUT=new Uint8Array(1024); for(let i=0;i<1024;i++) LUT[i]=Math.round(255*Math.pow(i/1023, st.gamma));
-  const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); return {a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:im.cover,sel:im.id===st.sel,bad:ev.status==='bad'};});
+  const imps=st.implants.map(im=>{const e=impEnds(im); const ev=evaluate(im); const cp=compGeo(im); return {a:e.apex,h:e.head,r:im.d/2,L:im.L,cv:cp.h,crb:cp.rb,crt:cp.rt,cc:cp.col,sel:im.id===st.sel,bad:ev.status==='bad'};});
   const segs=[]; st.nerves.forEach(pl=>{ for(let i=0;i<pl.length-1;i++) segs.push([pl[i],pl[i+1]]); });
   const NR=st.nerveR, hasOv=imps.length||segs.length, edge=q*1.1;
   o=0;
@@ -592,7 +611,7 @@ function renderImage(p){
           const dx=Bp[0]-A[0], dy=Bp[1]-A[1], dz=Bp[2]-A[2], l2=dx*dx+dy*dy+dz*dz; const t=l2?((x-A[0])*dx+(y-A[1])*dy+(z-A[2])*dz)/l2:0;
           const len=I.L, sAx=t*len; if(t<0||sAx>len+I.cv) continue;
           const ex=A[0]+dx*t-x, ey=A[1]+dy*t-y, ez=A[2]+dz*t-z, d=Math.sqrt(ex*ex+ey*ey+ez*ez);
-          if(sAx>len){ if(d<I.r*0.72){ const al=d>I.r*0.72-edge?0.9:0.55; R=R*(1-al)+214*al; G=G*(1-al)+178*al; B=B*(1-al)+60*al; break; } continue; }
+          if(sAx>len){ const rr=I.crb+(I.crt-I.crb)*Math.min(1,(sAx-len)/Math.max(0.6,I.cv*0.6)); if(d<rr){ const al=d>rr-edge?0.95:0.55; R=R*(1-al)+I.cc[0]*al; G=G*(1-al)+I.cc[1]*al; B=B*(1-al)+I.cc[2]*al; break; } continue; }
           let ro=I.r*(t<0.45?(0.6+0.4*t/0.45):1); if(sAx<0.3) ro*=0.85;
           if(d<ro){ const core=ro*0.8; let fill=d<core||sAx>len-0.6, thr=false;
             if(!fill){ const ph=(sAx%PITCH)/PITCH; fill = ph < 1-(d-core)/(ro-core)*0.85; thr=fill; }
@@ -772,6 +791,7 @@ panes.forEach(p=>{
     if(st.tool==='nerve'){ if(p.kind==='axial'&&st.mode==='plan'){ flash('Marque o canal na panorâmica ou na transversal.'); }
       if(st.activeNerve<0){ st.nerves.push([]); st.activeNerve=st.nerves.length-1; }
       st.nerves[st.activeNerve].push(P); invalidate(); return; }
+    if(st.tool==='implant' && p.kind==='pano' && !p.geo.aligned && !st.sel){ setPosFrom(p,P); flash('Transversal posicionada. Agora clique na crista, na transversal, para colocar o implante.'); return; }
     if(st.tool==='implant'){ if(p.kind==='axial'){ flash('Clique na transversal ou na panorâmica para posicionar o implante na crista.'); return; }
       const im=newImplant(P); st.frozen=alignFrame(); drag={type:'move',p,im,last:P}; invalidate(); return; }
     drag={type:'pan',p,x:e.clientX,y:e.clientY,px:p.panX,py:p.panY,moved:false,P};
@@ -815,7 +835,7 @@ panes.forEach(p=>{
 window.addEventListener('keydown',e=>{
   if(e.target.matches('input,select')) return;
   if((e.key==='Delete'||e.key==='Backspace')&&st.sel){ st.implants=st.implants.filter(i=>i.id!==st.sel); st.sel=null; invalidate(); e.preventDefault(); }
-  if(e.key==='Escape'){ if(st.curve.drawing){st.curve.drawing=false; buildCurve();} st.activeNerve=-1; invalidate(); }
+  if(e.key==='Escape'){ if(st.curve.drawing){st.curve.drawing=false; buildCurve();} st.activeNerve=-1; st.sel=null; st.frozen=null; invalidate(); }
 });
 
 let flashT=null; function flash(t){ const h=$('#hint'); h.innerHTML='<b>'+t+'</b>'; clearTimeout(flashT); flashT=setTimeout(()=>{h.innerHTML=HINTS[st.tool];},3200); }
@@ -858,9 +878,12 @@ function renderSide(){
         <label class="field" for="sel-l">Comprimento<select id="sel-l">${lOpts}</select></label>
         <label class="field" for="sel-r" style="grid-column:1/-1">Região (dente)<input id="sel-r" type="text" placeholder="ex.: 36" value="${esc(im.region)}" style="background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px"></label>
         <label class="field" for="sel-s">Superfície<select id="sel-s"><option ${im.surf==='Acqua'?'selected':''}>Acqua</option><option ${im.surf==='NeoPoros'?'selected':''}>NeoPoros</option></select></label>
-        <label class="field" for="sel-c">Parafuso de cobertura<select id="sel-c"><option value="0" ${im.cover===0?'selected':''}>0 mm · ${COVER[0]}</option><option value="2" ${im.cover===2?'selected':''}>2 mm · ${COVER[2]}</option></select></label>
+        <label class="field" for="sel-c">Componentes<select id="sel-c"><option value="none" ${im.comp.type==='none'?'selected':''}>Nenhum</option><option value="cover" ${im.comp.type==='cover'?'selected':''}>Parafuso de cobertura</option><option value="heal" ${im.comp.type==='heal'?'selected':''}>Cicatrizador</option></select></label>
+        ${im.comp.type==='cover'?`<label class="field" for="sel-ch" style="grid-column:1/-1">Altura<select id="sel-ch"><option value="0" ${im.comp.h===0?'selected':''}>0 mm · 117.021</option><option value="2" ${im.comp.h===2?'selected':''}>2 mm · 117.022</option></select></label>`:''}
+        ${im.comp.type==='heal'?`<label class="field" for="sel-cd">Ø do cicatrizador<select id="sel-cd">${HEAL_D.map(d=>`<option value="${d}" ${im.comp.d===d?'selected':''}>Ø ${hTxt(d)} mm</option>`).join('')}</select></label>
+        <label class="field" for="sel-ch">Transmucoso<select id="sel-ch">${healH(im.comp.d).map(h=>`<option value="${h}" ${im.comp.h===h?'selected':''}>${hTxt(h)} mm</option>`).join('')}</select></label>`:''}
       </div>
-      <dl class="kv"><dt>Código do implante</dt><dd>${impCode(im)}</dd><dt>Parafuso de cobertura</dt><dd>${COVER[im.cover]}</dd></dl>
+      <dl class="kv"><dt>Código do implante</dt><dd>${impCode(im)}</dd>${compCode(im)?`<dt>Código do componente</dt><dd>${compCode(im)}</dd>`:''}</dl>
       <div class="checks">
         <div class="check ${nerveS}"><span>Distância ao canal</span><span class="cv">${ev.dNerve==null?'sem canal':fmt(ev.dNerve)+' mm'}</span><span class="cd">${ev.dNerve==null?'Marque o canal mandibular para calcular.':'Margem segura: 2 mm ou mais da borda do canal.'}</span></div>
         <div class="check ${impS}"><span>Distância a outro implante</span><span class="cv">${ev.dImp==null?'—':fmt(ev.dImp)+' mm'}</span><span class="cd">Recomendado: 3 mm ou mais entre implantes.</span></div>
@@ -872,7 +895,12 @@ function renderSide(){
     $('#sel-d').addEventListener('change',e=>{ const head=impEnds(im).head; im.d=+e.target.value; const ls=lensFor(im.d); if(!ls.includes(im.L)){ im.L=ls.reduce((b,l)=>Math.abs(l-im.L)<Math.abs(b-im.L)?l:b, ls[0]); im.c=sub(head,mul(im.a,im.L/2)); } invalidate();});
     $('#sel-s').addEventListener('change',e=>{im.surf=e.target.value; invalidate({three:false});});
     $('#sel-r').addEventListener('change',e=>{im.region=e.target.value.trim(); invalidate({three:false,img:false});});
-    $('#sel-c').addEventListener('change',e=>{im.cover=+e.target.value; invalidate();});
+    $('#sel-c').addEventListener('change',e=>{ const t=e.target.value;
+      if(t==='cover') im.comp={type:'cover',h:0};
+      else if(t==='heal'){ const d=HEAL_D.reduce((b,x)=>Math.abs(x-im.d)<Math.abs(b-im.d)?x:b,HEAL_D[0]); im.comp={type:'heal',d,h:2.5}; }
+      else im.comp={type:'none'}; invalidate(); });
+    const sch=$('#sel-ch'); if(sch) sch.addEventListener('change',e=>{ im.comp.h=+e.target.value; invalidate(); });
+    const scd=$('#sel-cd'); if(scd) scd.addEventListener('change',e=>{ im.comp.d=+e.target.value; const hs=healH(im.comp.d); if(!hs.includes(im.comp.h)) im.comp.h=hs.reduce((b,x)=>Math.abs(x-im.comp.h)<Math.abs(b-im.comp.h)?x:b,hs[0]); invalidate(); });
     $('#sel-l').addEventListener('change',e=>{ const head=impEnds(im).head; im.L=+e.target.value; im.c=sub(head,mul(im.a,im.L/2)); invalidate();});
     $('#btn-vert').addEventListener('click',()=>{ const head=impEnds(im).head; im.a=[0,0,im.a[2]<0?-1:1]; im.c=sub(head,mul(im.a,im.L/2)); centerOn(im); });
     $('#btn-flip').addEventListener('click',()=>{ const head=impEnds(im).head; im.a=mul(im.a,-1); im.c=sub(head,mul(im.a,im.L/2)); centerOn(im); });
@@ -1033,7 +1061,7 @@ function sync3D(){
     prof.push(new THREE.Vector2(im.d/2,im.L/2)); prof.push(new THREE.Vector2(im.d*0.18,im.L/2)); prof.push(new THREE.Vector2(im.d*0.18,im.L/2-0.8)); prof.push(new THREE.Vector2(0,im.L/2-0.8));
     const mat=new THREE.MeshStandardMaterial({color:col, metalness:0.35, roughness:0.35, side:THREE.DoubleSide});
     const grp=new THREE.Group(); grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof,32),mat));
-    if(im.cover>0){ const cap=new THREE.Mesh(new THREE.CylinderGeometry(im.d*0.36,im.d*0.36,im.cover,24), new THREE.MeshStandardMaterial({color:0xD6B23C, metalness:0.5, roughness:0.3})); cap.position.y=im.L/2+im.cover/2; grp.add(cap); }
+    { const cp=compGeo(im); if(cp.h>0){ const rt=cp.rt, rb=cp.rb; const cap=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,cp.h,28), new THREE.MeshStandardMaterial({color:cp.hex, metalness:0.5, roughness:0.3})); cap.position.y=im.L/2+cp.h/2; grp.add(cap); } }
     const ghost=new THREE.Mesh(grp.children[0].geometry.clone(), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.45, depthWrite:false, depthFunc:THREE.GreaterDepth}));
     ghost.renderOrder=2; grp.add(ghost);
     grp.position.set(im.c[0],im.c[1],im.c[2]); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(im.a[0],im.a[1],im.a[2])); G.add(grp); });
@@ -1180,9 +1208,9 @@ function openReport(){
   if(!st.implants.length){ flash('Posicione ao menos um implante para gerar o relatório.'); return; }
   repData=collectReport(); const d=repData;
   const td=(v,s)=>`<td${s?` class="st-${s}"`:''}>${v}</td>`;
-  const tableRows=d.rows.map(r=>`<tr>${td(r.n)}${td(esc(r.im.region||'—'))}${td('Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L))}${td(r.im.surf)}${td(r.code)}${td(r.im.cover+' mm · '+COVER[r.im.cover])}${td(fmt(r.ev.angle,0)+'°')}${td(r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS)}${td(r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS)}${td(fmt(r.ev.bone,0)+'%',r.bS)}${td(stText(r.ev.status),r.ev.status)}</tr>`).join('');
+  const tableRows=d.rows.map(r=>`<tr>${td(r.n)}${td(esc(r.im.region||'—'))}${td('Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L))}${td(r.im.surf)}${td(r.code)}${td(compTxt(r.im))}${td(fmt(r.ev.angle,0)+'°')}${td(r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS)}${td(r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS)}${td(fmt(r.ev.bone,0)+'%',r.bS)}${td(stText(r.ev.status),r.ev.status)}</tr>`).join('');
   const cards=d.rows.map(r=>`<div class="rep-imp">${r.shot?`<img src="${r.shot.url}" alt="Corte do implante ${r.n}">`:'<div></div>'}<div><h4>Implante ${r.n}${r.im.region?' · região '+esc(r.im.region):''}</h4><dl>
-    <dt>Implante</dt><dd>Helix GM Ø ${dTxt(r.im.d)} × ${lTxt(r.im.L)} mm</dd><dt>Superfície</dt><dd>${r.im.surf}</dd><dt>Código</dt><dd>${r.code}</dd><dt>Parafuso de cobertura</dt><dd>${r.im.cover} mm · ${COVER[r.im.cover]}</dd>
+    <dt>Implante</dt><dd>Helix GM Ø ${dTxt(r.im.d)} × ${lTxt(r.im.L)} mm</dd><dt>Superfície</dt><dd>${r.im.surf}</dd><dt>Código</dt><dd>${r.code}</dd><dt>Componente</dt><dd>${compTxt(r.im)}</dd>
     <dt>Inclinação</dt><dd>${fmt(r.ev.angle,0)}°</dd><dt>Distância ao canal</dt><dd class="${r.nS?'st-'+r.nS:''}">${r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm'}</dd>
     <dt>Implante vizinho</dt><dd class="${r.iS?'st-'+r.iS:''}">${r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm'}</dd><dt>Superfície em osso</dt><dd class="st-${r.bS}">${fmt(r.ev.bone,0)}%</dd>
     <dt>Avaliação</dt><dd class="st-${r.ev.status}">${stText(r.ev.status)}</dd></dl></div></div>`).join('');
@@ -1195,7 +1223,7 @@ function openReport(){
       <label>Voxel<span class="ro">${d.voxel}</span></label>
     </div></section>
     ${d.pano?`<section><h3>Panorâmica reconstruída</h3><img class="shot" src="${d.pano.url}" alt="Panorâmica com os implantes numerados"></section>`:''}
-    <section><h3>Implantes selecionados</h3><div class="rep-table-wrap"><table class="rep-table"><tr><th>Nº</th><th>Região</th><th>Neodent Helix GM (mm)</th><th>Superfície</th><th>Código</th><th>Cobertura</th><th>Incl.</th><th>Canal</th><th>Vizinho</th><th>Osso</th><th>Avaliação</th></tr>${tableRows}</table></div></section>
+    <section><h3>Implantes selecionados</h3><div class="rep-table-wrap"><table class="rep-table"><tr><th>Nº</th><th>Região</th><th>Neodent Helix GM (mm)</th><th>Superfície</th><th>Código</th><th>Componente</th><th>Incl.</th><th>Canal</th><th>Vizinho</th><th>Osso</th><th>Avaliação</th></tr>${tableRows}</table></div></section>
     <section><h3>Cortes de cada implante</h3><div class="rep-imps">${cards}</div></section>
     ${d.three?`<section><h3>Reconstrução 3D</h3><img class="shot" src="${d.three.url}" alt="Reconstrução 3D com implantes"></section>`:''}
     <section><h3>Observações</h3><textarea id="rep-notes" rows="4" style="width:100%;box-sizing:border-box" placeholder="Justificativa da escolha, enxerto, componentes protéticos…">${esc(rep.notes)}</textarea></section>
@@ -1206,6 +1234,9 @@ function openReport(){
   $('#report').hidden=false; $('#report').scrollTop=0;
 }
 $('#btn-report').addEventListener('click',openReport);
+function startNewImplant(){ if(!st.vol){ flash('Abra uma tomografia primeiro.'); return; } st.sel=null; st.frozen=null; setTool('implant');
+  flash(st.curve.S ? 'Na panorâmica, clique na região do novo implante para levar a transversal até lá. Depois clique na crista da transversal.' : 'Desenhe a curva da arcada no axial primeiro (ferramenta Curva).'); invalidate(); }
+$('#btn-new-imp').addEventListener('click',startNewImplant);
 $('#rep-close').addEventListener('click',()=>{ $('#report').hidden=true; });
 
 let downloadsNS=null;
@@ -1231,23 +1262,23 @@ async function buildPDF(){
   const section=t=>{ need(10); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...mag); doc.text(t.toUpperCase(),M,y); doc.setFont('helvetica','normal'); y+=4; };
   if(d.pano){ const w=PW-2*M, h=Math.min(70,w*d.pano.h/d.pano.w), ww=h*d.pano.w/d.pano.h; need(h+14); section('Panorâmica reconstruída'); doc.addImage(d.pano.url,'JPEG',M+(w-ww)/2,y,ww,h); y+=h+8; }
   section('Implantes selecionados');
-  const cols=[['Nº',8],['Região',15],['Helix GM',24],['Superf.',18],['Código',17],['Cobertura',24],['Incl.',11],['Canal',17],['Vizinho',17],['Osso',12],['Aval.',19]];
+  const cols=[['Nº',7],['Região',11],['Helix GM',23],['Superf.',15],['Código',15],['Componente',38],['Incl.',10],['Canal',16],['Vizinho',15],['Osso',11],['Aval.',19]];
   const rowH=6.5; need(rowH*2);
   doc.setFontSize(7); doc.setTextColor(...grey); let x=M; cols.forEach(c=>{ doc.text(c[0].toUpperCase(),x+1,y+3.5); x+=c[1]; }); y+=5; doc.setDrawColor(...navy); doc.setLineWidth(0.5); doc.line(M,y,PW-M,y); y+=1;
   doc.setFontSize(8.5);
-  d.rows.forEach(r=>{ need(rowH); const cells=[[String(r.n)],[r.im.region||'—'],['Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)],[r.im.surf],[r.code],[r.im.cover+' mm · '+COVER[r.im.cover]],[fmt(r.ev.angle,0)+'°'],[r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],[r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],[fmt(r.ev.bone,0)+'%',r.bS],[stText(r.ev.status),r.ev.status]];
-    let xx=M; cells.forEach((c,i)=>{ doc.setTextColor(...(c[1]?stCol[c[1]]:ink)); if(c[1]) doc.setFont('helvetica','bold'); doc.text(String(c[0]),xx+1,y+4.3); doc.setFont('helvetica','normal'); xx+=cols[i][1]; });
+  d.rows.forEach(r=>{ need(rowH); const cells=[[String(r.n)],[r.im.region||'—'],['Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)],[r.im.surf],[r.code],[compTxt(r.im),null,7.2],[fmt(r.ev.angle,0)+'°'],[r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],[r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],[fmt(r.ev.bone,0)+'%',r.bS],[stText(r.ev.status),r.ev.status]];
+    let xx=M; cells.forEach((c,i)=>{ doc.setTextColor(...(c[1]?stCol[c[1]]:ink)); if(c[1]) doc.setFont('helvetica','bold'); if(c[2]) doc.setFontSize(c[2]); doc.text(String(c[0]),xx+1,y+4.3); if(c[2]) doc.setFontSize(8.5); doc.setFont('helvetica','normal'); xx+=cols[i][1]; });
     y+=rowH; doc.setDrawColor(221,227,234); doc.setLineWidth(0.2); doc.line(M,y,PW-M,y); });
   y+=8;
   need(72); section('Cortes de cada implante');
   const cw=(PW-2*M-6)/2; let col=0, rowTop=y, rowMax=0;
-  d.rows.forEach(r=>{ const iw=38, ih=r.shot?Math.min(60,iw*r.shot.h/r.shot.w):0, bh=Math.max(ih,52)+6;
+  d.rows.forEach(r=>{ const iw=38, ih=r.shot?Math.min(60,iw*r.shot.h/r.shot.w):0, bh=Math.max(ih,63)+6;
     if(col===0){ need(bh); rowTop=y; rowMax=0; }
     const x0=M+col*(cw+6); doc.setDrawColor(221,227,234); doc.setLineWidth(0.3); doc.roundedRect(x0,rowTop,cw,bh,2,2);
     if(r.shot) doc.addImage(r.shot.url,'JPEG',x0+3,rowTop+3,iw,ih);
     const tx=x0+iw+7; let ty=rowTop+7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text('Implante '+r.n+(r.im.region?' · região '+r.im.region:''),tx,ty); ty+=6;
     doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    const kv=[['Implante','Helix GM Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)+' mm'],['Superfície',r.im.surf],['Código',r.code],['Cobertura',r.im.cover+' mm · '+COVER[r.im.cover]],['Inclinação',fmt(r.ev.angle,0)+'°'],['Canal',r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],['Vizinho',r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],['Osso',fmt(r.ev.bone,0)+'%',r.bS],['Avaliação',stText(r.ev.status),r.ev.status]];
+    const kv=[['Helix GM','Ø '+dTxt(r.im.d)+' × '+lTxt(r.im.L)+' mm'],['Superfície',r.im.surf],['Código',r.code],['Componente',compParts(r.im)[0]],['Medida comp.',compParts(r.im)[1]],['Cód. comp.',compParts(r.im)[2]],['Inclinação',fmt(r.ev.angle,0)+'°'],['Canal',r.ev.dNerve==null?'sem canal':fmt(r.ev.dNerve)+' mm',r.nS],['Vizinho',r.ev.dImp==null?'—':fmt(r.ev.dImp)+' mm',r.iS],['Osso',fmt(r.ev.bone,0)+'%',r.bS],['Avaliação',stText(r.ev.status),r.ev.status]];
     kv.forEach(k=>{ doc.setTextColor(...grey); doc.text(k[0],tx,ty); doc.setTextColor(...(k[2]?stCol[k[2]]:ink)); doc.text(String(k[1]),x0+cw-3,ty,{align:'right'}); ty+=4.6; });
     rowMax=Math.max(rowMax,bh); col++; if(col===2){ col=0; y=rowTop+rowMax+5; } });
   if(col===1) y=rowTop+rowMax+5;
